@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-const API_URL = '/api/health';
+const API_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/health`;
 
 export default function App() {
   const [status, setStatus] = useState('Cargando...');
