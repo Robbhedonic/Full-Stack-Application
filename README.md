@@ -145,3 +145,53 @@ This project is prepared to continue with:
 - Frontend-backend integration working through /api proxy
 - ESLint and Prettier configured
 - Ready for Docker and cloud deployment steps
+
+## Run with Docker
+
+Build and start all services:
+
+```bash
+docker compose up -d --build
+```
+
+Check running containers:
+
+```bash
+docker compose ps
+```
+
+Stop and remove containers:
+
+```bash
+docker compose down
+```
+
+Docker URLs:
+
+- Frontend: http://localhost:5173
+- Backend: http://localhost:4000
+
+## Cloud Deployment (Railway - Single Service)
+
+This project is configured to deploy frontend and backend together as one Railway service.
+
+How it works:
+
+- The root Dockerfile builds the frontend (Vite)
+- The backend serves the built frontend as static files
+- API and UI share the same domain
+
+### Railway Setup
+
+1. In Railway, create a new project from this GitHub repository.
+2. Keep the deployment at repository root.
+3. Railway will use railway.toml and the root Dockerfile automatically.
+4. After deployment, open:
+
+- / for the frontend
+- /api/health for backend health check
+
+Notes:
+
+- PORT is provided automatically by Railway.
+- No separate frontend platform is needed.

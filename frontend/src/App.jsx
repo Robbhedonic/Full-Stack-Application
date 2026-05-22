@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 
-const API_URL = '/api/health';
+const rawApiBase = import.meta.env.VITE_API_URL || '';
+const apiBase = rawApiBase.endsWith('/') ? rawApiBase.slice(0, -1) : rawApiBase;
+const API_URL = `${apiBase}/api/health`;
 
 export default function App() {
   const [status, setStatus] = useState('Cargando...');
