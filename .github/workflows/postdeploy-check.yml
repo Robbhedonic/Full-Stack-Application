@@ -1,0 +1,25 @@
+name: Post-Deploy Check
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_url:
+        description: Public app URL (for example, https://your-app.up.railway.app)
+        required: true
+        type: string
+
+jobs:
+  smoke-test:
+    name: Smoke test deployed app
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run post-deploy checks
+        run: node scripts/postdeploy-check.mjs "${{ inputs.app_url }}"

@@ -4,7 +4,7 @@ Production-oriented full-stack starter project with:
 
 - Frontend: React + Vite
 - Backend: Node.js + Express
-- Code quality: ESLint + Prettier
+- Code quality: ESLint  + Prettier
 
 This repository is designed to be a clean base for development, testing, Dockerization, and cloud deployment.
 
@@ -177,7 +177,7 @@ This project is configured to deploy frontend and backend together as one Railwa
 
 How it works:
 
-- The root Dockerfile builds the frontend (Vite)
+- The root Dockerfile  builds the frontend (Vite)
 - The backend serves the built frontend as static files
 - API and UI share the same domain
 
@@ -195,3 +195,30 @@ Notes:
 
 - PORT is provided automatically by Railway.
 - No separate frontend platform is needed.
+
+## Post-Deploy Verification
+
+Run an automated smoke test against your public URL:
+
+```bash
+node scripts/postdeploy-check.mjs https://your-app.up.railway.app
+```
+
+This validates:
+
+- `GET /` returns HTML
+- `GET /api/health` returns `{ "status": "ok" }`
+
+## GitHub Actions
+
+This project includes two workflows:
+
+- `CI`: runs on push to `main` and pull requests, validates backend and frontend (`lint` + frontend `build`).
+- `Post-Deploy Check`: manual workflow (`workflow_dispatch`) to run smoke tests against your public deployed URL.
+
+To run the post-deploy workflow:
+
+1. Open your repository on GitHub.
+2. Go to **Actions**.
+3. Select **Post-Deploy Check**.
+4. Click **Run workflow** and provide `app_url` (for example: `https://your-app.up.railway.app`).
