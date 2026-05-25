@@ -9,11 +9,11 @@ Production-oriented full-stack starter project with:
 This repository is designed to be a clean base for development, testing, Dockerization, and cloud deployment.
 
 ## Project Architecture
-
+ 
 The app is split into two independent services:
 
 - frontend: Single Page Application (SPA) served by Vite during development.
-- backend: REST API built with Express.
+- backend: REST API built with Express..
 
 During local development, the frontend proxies /api requests to the backend running on port 4000.
 
