@@ -1,12 +1,12 @@
 import 'dotenv/config';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import cors from 'cors';
 import express from 'express';
 import healthRouter from './routes/health.js';
 
-const app = express();
+export const app = express();
 const port = Number(process.env.PORT || 4000);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,6 +27,14 @@ if (existsSync(publicDir)) {
   });
 }
 
-app.listen(port, () => {
-  console.log(`API listening on http://localhost:${port}`);
-});
+export function startServer() {
+  return app.listen(port, () => {
+    console.log(`API listening on http://localhost:${port}`);
+  });
+}
+
+const isMainModule = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isMainModule) {
+  startServer();
+}
