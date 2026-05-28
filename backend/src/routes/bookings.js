@@ -1,10 +1,7 @@
 import { Router } from 'express';
 import { bookings, sitters, createBooking } from '../data.js';
-import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
-
-router.use(requireAuth);
 
 router.get('/', (req, res) => {
   const sitterId = req.query.sitterId;

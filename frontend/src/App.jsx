@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { API, apiFetch } from './api.js';
+import { pageToPath, pathToPage } from './routes.js';
+
+const rawApiBase = import.meta.env.VITE_API_URL || '';
+const apiBase = rawApiBase.endsWith('/') ? rawApiBase.slice(0, -1) : rawApiBase;
+const HEALTH_URL = `${apiBase}/api/health`;
+const SITTERS_URL = `${apiBase}/api/sitters`;
+const BOOKINGS_URL = `${apiBase}/api/bookings`;
 
 function formatDate(value) {
   if (!value) return 'Pending';
@@ -25,33 +31,57 @@ export default function App() {
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authMessage, setAuthMessage] = useState('');
-  const [authLoading, setAuthLoading] = useState(true);
+
+  const navigate = useCallback((page) => {
+    const path = pageToPath(page);
+    window.history.pushState({ page }, '', path);
+    setCurrentPage(page);
+    if (page === 'login' || page === 'register') {
+      setAuthMode(page);
+    }
+  }, []);
+
+  useEffect(() => {
+    function syncFromUrl() {
+      const { pathname } = window.location;
+
+      if (pathname === '/' || pathname === '') {
+        window.history.replaceState({ page: 'home' }, '', '/home');
+        setCurrentPage('home');
+        return;
+      }
+
+      const page = pathToPage(pathname);
+      setCurrentPage(page);
+      if (page === 'login' || page === 'register') {
+        setAuthMode(page);
+      }
+    }
+
+    syncFromUrl();
+    window.addEventListener('popstate', syncFromUrl);
+    return () => window.removeEventListener('popstate', syncFromUrl);
+  }, []);
 
   const loadSitters = useCallback(async () => {
     try {
-      const { response, data } = await apiFetch(API.sitters);
-      if (!response.ok) {
-        throw new Error(data?.error || 'Failed to load sitters');
-      }
+      const res = await fetch(SITTERS_URL);
+      const data = await res.json();
       setSitters(data.sitters || []);
-      if (data.sitters?.length > 0) {
+      setStatus('ready');
+      if (data.sitters.length > 0) {
         setSelectedSitter((previous) => previous || data.sitters[0].id);
       }
-    } catch {
+    } catch (error) {
+      setStatus('error');
       setMessage('Unable to load sitters.');
     }
   }, []);
 
   const loadBookings = useCallback(async () => {
     try {
-      const { response, data } = await apiFetch(API.bookings);
-      if (response.status === 401) {
-        setBookings([]);
-        return;
-      }
-      if (!response.ok) {
-        throw new Error(data?.error || 'Failed to load bookings');
-      }
+      const res = await fetch(BOOKINGS_URL);
+      const data = await res.json();
       setBookings(data.bookings || []);
     } catch {
       setMessage('Unable to load bookings.');
@@ -60,47 +90,28 @@ export default function App() {
 
   const loadHealth = useCallback(async () => {
     try {
-      const { response, data } = await apiFetch(API.health);
-      setStatus(response.ok && data?.status === 'ok' ? 'ready' : 'offline');
+      const res = await fetch(HEALTH_URL);
+      const data = await res.json();
+      setStatus(data.status === 'ok' ? 'ready' : 'offline');
     } catch {
       setStatus('offline');
     }
   }, []);
 
-  const loadSession = useCallback(async () => {
-    try {
-      const { response, data } = await apiFetch(API.me);
-      if (response.ok) {
-        setAuthUser(data.user);
-      } else {
-        setAuthUser(null);
-      }
-    } catch {
-      setAuthUser(null);
-    } finally {
-      setAuthLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
+    loadSitters();
+    loadBookings();
     loadHealth();
-    loadSession();
-  }, [loadHealth, loadSession]);
-
-  useEffect(() => {
-    if (authUser) {
-      loadSitters();
-      loadBookings();
-    }
-  }, [authUser, loadSitters, loadBookings]);
+  }, [loadSitters, loadBookings, loadHealth]);
 
   async function handleSubmit(event) {
     event.preventDefault();
     setMessage('Creating booking...');
 
     try {
-      const { response, data } = await apiFetch(API.bookings, {
+      const response = await fetch(BOOKINGS_URL, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sitterId: selectedSitter,
           ownerName,
@@ -110,8 +121,9 @@ export default function App() {
         }),
       });
 
+      const data = await response.json();
       if (!response.ok) {
-        setMessage(data?.error || 'Booking failed');
+        setMessage(data.error || 'Booking failed');
         return;
       }
 
@@ -125,62 +137,25 @@ export default function App() {
     }
   }
 
-  async function handleAuthSubmit(event) {
+  function handleAuthSubmit(event) {
     event.preventDefault();
-    setAuthMessage('');
+    const displayName = authMode === 'register' ? authName || authEmail.split('@')[0] : authEmail.split('@')[0];
+    const user = {
+      name: displayName,
+      email: authEmail,
+      role: userType,
+    };
 
-    const path = authMode === 'login' ? API.login : API.register;
-    const body =
+    setAuthUser(user);
+    setAuthMessage(
       authMode === 'login'
-        ? { email: authEmail, password: authPassword }
-        : { name: authName, email: authEmail, password: authPassword, role: userType };
-
-    try {
-      const { response, data } = await apiFetch(path, {
-        method: 'POST',
-        body: JSON.stringify(body),
-      });
-
-      if (!response.ok) {
-        setAuthMessage(data?.error || 'Authentication failed');
-        return;
-      }
-
-      setAuthUser(data.user);
-      setAuthMessage(
-        authMode === 'login'
-          ? `Bienvenido de nuevo, ${data.user.name}!`
-          : `Cuenta creada como ${data.user.name}`
-      );
-      setAuthName('');
-      setAuthEmail('');
-      setAuthPassword('');
-      setCurrentPage('dashboard');
-    } catch {
-      setAuthMessage('No se pudo conectar con el servidor.');
-    }
-  }
-
-  async function handleLogout() {
-    try {
-      await apiFetch(API.logout, { method: 'POST' });
-    } catch {
-      // Session cleared client-side even if request fails.
-    }
-    setAuthUser(null);
-    setBookings([]);
-    setSitters([]);
-    setCurrentPage('home');
-    setAuthMessage('');
-    setMessage('');
-  }
-
-  if (authLoading) {
-    return (
-      <main className="app-shell">
-        <p className="hero-note">Cargando sesión...</p>
-      </main>
+        ? `Welcome back, ${displayName}!`
+        : `Account created for ${displayName}`
     );
+    setAuthName('');
+    setAuthEmail('');
+    setAuthPassword('');
+    navigate('dashboard');
   }
 
   return (
@@ -203,7 +178,7 @@ export default function App() {
               <span className={`status-pill ${status === 'ready' ? 'status-ok' : status === 'loading' ? 'status-checking' : 'status-offline'}`}>
                 {status === 'ready' ? 'Service ready' : status === 'loading' ? 'Checking service' : 'Offline'}
               </span>
-              <p className="hero-note">{message || 'Elige registrarte o iniciar sesión para ver el contenido.'}</p>
+              <p className="hero-note">{message || 'Register or sign in to view sitters and manage bookings.'}</p>
             </div>
 
             <div className="feature-grid">
@@ -222,17 +197,12 @@ export default function App() {
             </div>
 
             <div className="hero-actions">
-              <button type="button" className="action-btn" onClick={() => { setAuthMode('register'); setCurrentPage('register'); }}>
+              <button type="button" className="action-btn" onClick={() => navigate('register')}>
                 Register now
               </button>
-              <button type="button" className="secondary-btn" onClick={() => { setAuthMode('login'); setCurrentPage('login'); }}>
+              <button type="button" className="secondary-btn" onClick={() => navigate('login')}>
                 Login
               </button>
-              {authUser && (
-                <button type="button" className="secondary-btn" onClick={() => setCurrentPage('dashboard')}>
-                  Go to dashboard
-                </button>
-              )}
             </div>
           </section>
         </article>
@@ -240,16 +210,16 @@ export default function App() {
 
       {(currentPage === 'login' || currentPage === 'register') && (
         <article className="status-card auth-page-card">
-          <button type="button" className="back-btn" onClick={() => setCurrentPage('home')}>
-            ← Volver a home
+          <button type="button" className="back-btn" onClick={() => navigate('home')}>
+            ← Back to home
           </button>
 
           <section className="auth-panel">
             <div className="auth-header">
-              <button className={authMode === 'login' ? 'tab active' : 'tab'} onClick={() => setAuthMode('login')}>
+              <button className={authMode === 'login' ? 'tab active' : 'tab'} onClick={() => navigate('login')}>
                 Login
               </button>
-              <button className={authMode === 'register' ? 'tab active' : 'tab'} onClick={() => setAuthMode('register')}>
+              <button className={authMode === 'register' ? 'tab active' : 'tab'} onClick={() => navigate('register')}>
                 Register
               </button>
             </div>
@@ -258,8 +228,8 @@ export default function App() {
               <h2>{authMode === 'login' ? 'Login' : 'Register'}</h2>
               <p className="hero-note">
                 {authMode === 'login'
-                  ? 'Inicia sesión para acceder a la plataforma y ver el contenido.'
-                  : 'Crea tu cuenta y elige tu rol para empezar a gestionar reservas.'}
+                  ? 'Sign in to access the platform and view sitters and bookings.'
+                  : 'Create your account, choose your role, and start managing reservations.'}
               </p>
               <form onSubmit={handleAuthSubmit} className="auth-form">
                 {authMode === 'register' && (
@@ -276,7 +246,7 @@ export default function App() {
 
                 <label>
                   Password
-                  <input type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} placeholder="Enter password" required minLength={6} />
+                  <input type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} placeholder="Enter password" required />
                 </label>
 
                 {authMode === 'register' && (
@@ -313,119 +283,104 @@ export default function App() {
 
       {currentPage === 'dashboard' && (
         <article className="status-card booking-card">
-          {!authUser ? (
-            <>
-              <h2>Acceso requerido</h2>
-              <p>Inicia sesión para ver sitters y gestionar reservas.</p>
-              <button type="button" className="action-btn" onClick={() => { setAuthMode('login'); setCurrentPage('login'); }}>
-                Ir a login
-              </button>
-            </>
-          ) : (
-            <>
-              <section className="section-header">
-                <h2>Bienvenido, {authUser.name}</h2>
-                <p>Accede al marketplace y gestiona tus reservas de mascotas o plantas.</p>
-              </section>
+          <section className="section-header">
+            <h2>Welcome{authUser ? `, ${authUser.name}` : ''}</h2>
+            <p>Browse the marketplace and manage your pet or plant care reservations.</p>
+          </section>
 
-              <div className="hero-actions">
-                <button type="button" className="back-btn" onClick={() => setCurrentPage('home')}>
-                  ← Volver a home
-                </button>
-                <button type="button" className="secondary-btn" onClick={handleLogout}>
-                  Logout
-                </button>
-              </div>
+          <div className="hero-actions">
+            <button type="button" className="back-btn" onClick={() => navigate('home')}>
+              ← Back to home
+            </button>
+          </div>
 
-              <section className="grid-listing">
-                <div className="panel">
-                  <h3>Available Sitters</h3>
-                  {sitters.length === 0 ? (
-                    <p>No sitters available yet.</p>
-                  ) : (
-                    <ul className="sitter-list">
-                      {sitters.map((sitter) => (
-                        <li key={sitter.id} className="sitter-card">
-                          <h4>{sitter.name}</h4>
-                          <p>{sitter.description}</p>
-                          <div className="sitter-meta">
-                            <span>{sitter.type} care</span>
-                            <span>{sitter.location}</span>
-                            <span>${sitter.pricePerHour}/hr</span>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
+          <section className="grid-listing">
+            <div className="panel">
+              <h3>Available Sitters</h3>
+              {sitters.length === 0 ? (
+                <p>No sitters available yet.</p>
+              ) : (
+                <ul className="sitter-list">
+                  {sitters.map((sitter) => (
+                    <li key={sitter.id} className="sitter-card">
+                      <h4>{sitter.name}</h4>
+                      <p>{sitter.description}</p>
+                      <div className="sitter-meta">
+                        <span>{sitter.type} care</span>
+                        <span>{sitter.location}</span>
+                        <span>${sitter.pricePerHour}/hr</span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
 
-                <div className="panel">
-                  <h3>Book a sitter</h3>
-                  <form onSubmit={handleSubmit} className="booking-form">
-                    <label>
-                      Owner name
-                      <input value={ownerName} onChange={(e) => setOwnerName(e.target.value)} placeholder="Your full name" required />
-                    </label>
+            <div className="panel">
+              <h3>Book a sitter</h3>
+              <form onSubmit={handleSubmit} className="booking-form">
+                <label>
+                  Owner name
+                  <input value={ownerName} onChange={(e) => setOwnerName(e.target.value)} placeholder="Your full name" required />
+                </label>
 
-                    <label>
-                      Care type
-                      <select value={serviceType} onChange={(e) => setServiceType(e.target.value)}>
-                        <option value="pet">Pet care</option>
-                        <option value="plant">Plant care</option>
-                      </select>
-                    </label>
+                <label>
+                  Care type
+                  <select value={serviceType} onChange={(e) => setServiceType(e.target.value)}>
+                    <option value="pet">Pet care</option>
+                    <option value="plant">Plant care</option>
+                  </select>
+                </label>
 
-                    <label>
-                      Sitter
-                      <select value={selectedSitter} onChange={(e) => setSelectedSitter(e.target.value)}>
-                        {sitters.map((sitter) => (
-                          <option key={sitter.id} value={sitter.id}>
-                            {sitter.name} ({sitter.type})
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <label>
-                      Start date
-                      <input type="datetime-local" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
-                    </label>
-
-                    <label>
-                      Duration (hours)
-                      <input type="number" min="1" value={durationHours} onChange={(e) => setDurationHours(Number(e.target.value))} required />
-                    </label>
-
-                    <button type="submit" className="action-btn">
-                      Request Care
-                    </button>
-                  </form>
-                </div>
-              </section>
-
-              <section className="panel bookings-panel">
-                <h3>Your reservations</h3>
-                {bookings.length === 0 ? (
-                  <p>No bookings yet. Create your first care request.</p>
-                ) : (
-                  <ul className="booking-list">
-                    {bookings.map((booking) => (
-                      <li key={booking.id} className="booking-card">
-                        <div>
-                          <strong>{booking.ownerName}</strong> booked <strong>{booking.serviceType}</strong>
-                        </div>
-                        <div className="booking-meta">
-                          <span>{formatDate(booking.startDate)}</span>
-                          <span>{booking.durationHours} hrs</span>
-                          <span>{booking.status}</span>
-                        </div>
-                      </li>
+                <label>
+                  Sitter
+                  <select value={selectedSitter} onChange={(e) => setSelectedSitter(e.target.value)}>
+                    {sitters.map((sitter) => (
+                      <option key={sitter.id} value={sitter.id}>
+                        {sitter.name} ({sitter.type})
+                      </option>
                     ))}
-                  </ul>
-                )}
-              </section>
-            </>
-          )}
+                  </select>
+                </label>
+
+                <label>
+                  Start date
+                  <input type="datetime-local" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
+                </label>
+
+                <label>
+                  Duration (hours)
+                  <input type="number" min="1" value={durationHours} onChange={(e) => setDurationHours(Number(e.target.value))} required />
+                </label>
+
+                <button type="submit" className="action-btn">
+                  Request Care
+                </button>
+              </form>
+            </div>
+          </section>
+
+          <section className="panel bookings-panel">
+            <h3>Your reservations</h3>
+            {bookings.length === 0 ? (
+              <p>No bookings yet. Create your first care request.</p>
+            ) : (
+              <ul className="booking-list">
+                {bookings.map((booking) => (
+                  <li key={booking.id} className="booking-card">
+                    <div>
+                      <strong>{booking.ownerName}</strong> booked <strong>{booking.serviceType}</strong>
+                    </div>
+                    <div className="booking-meta">
+                      <span>{formatDate(booking.startDate)}</span>
+                      <span>{booking.durationHours} hrs</span>
+                      <span>{booking.status}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
         </article>
       )}
     </main>
