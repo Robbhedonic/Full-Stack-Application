@@ -5,6 +5,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import cors from 'cors';
 import express from 'express';
 import healthRouter from './routes/health.js';
+import sittersRouter from './routes/sitters.js';
+import bookingsRouter from './routes/bookings.js';
 
 export const app = express();
 const port = Number(process.env.PORT || 4000);
@@ -15,6 +17,8 @@ const publicDir = path.resolve(__dirname, '../public');
 app.use(cors());
 app.use(express.json());
 app.use('/api', healthRouter);
+app.use('/api/sitters', sittersRouter);
+app.use('/api/bookings', bookingsRouter);
 
 if (existsSync(publicDir)) {
   app.use(express.static(publicDir));

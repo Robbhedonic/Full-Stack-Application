@@ -1,21 +1,32 @@
-# Full-Stack Application
+# PetCare
 
-Production-oriented full-stack starter project with:
+PetCare is a production-ready full-stack booking platform for pet and plant care services.
+
+This repository demonstrates a modern web application with:
 
 - Frontend: React + Vite
 - Backend: Node.js + Express
-- Code quality: ESLint  + Prettier
+- Dockerization for local and cloud deployment
+- Tests for production-like behavior
 
-This repository is designed to be a clean base for development, testing, Dockerization, and cloud deployment.
+## Project Overview
 
-## Project Architecture
- 
-The app is split into two independent services:
+PetCare lets owners book care services from registered sitters.
+The platform is designed to support:
 
-- frontend: Single Page Application (SPA) served by Vite during development.
-- backend: REST API built with Express..
+- pet sitters and plant sitters
+- availability and booking requests
+- owner reservation management
+- authenticated access for users and providers
 
-During local development, the frontend proxies /api requests to the backend running on port 4000.
+## Architecture
+
+The app is split into two services:
+
+- `frontend`: React SPA built with Vite
+- `backend`: Express REST API
+
+During local development, the frontend fetches data from the backend API on port 4000.
 
 ## Project Structure
 
@@ -34,11 +45,12 @@ During local development, the frontend proxies /api requests to the backend runn
 │   │   ├── routes/
 │   │   │   └── health.js
 │   │   └── server.js
+│   ├── test/
+│   │   └── health.test.js
 │   ├── .env.example
 │   └── package.json
-├── .eslintignore
-├── .prettierignore
-├── .prettierrc
+├── docker-compose.yml
+├── Dockerfile
 └── README.md
 ```
 
@@ -46,24 +58,25 @@ During local development, the frontend proxies /api requests to the backend runn
 
 - Node.js 20+
 - npm 10+
+- Docker (for container testing)
 
 ## Local Setup
 
-1. Install frontend dependencies:
+Install frontend dependencies:
 
 ```bash
 cd frontend
 npm install
 ```
 
-2. Install backend dependencies:
+Install backend dependencies:
 
 ```bash
 cd ../backend
 npm install
 ```
 
-3. Create backend environment file:
+Copy the backend environment file:
 
 ```bash
 cp .env.example .env
@@ -85,17 +98,18 @@ cd frontend
 npm run dev
 ```
 
+
 Default local URLs:
 
 - Frontend: http://localhost:5173
 - Backend: http://localhost:4000
 
-## API
+## API Endpoints
 
 ### Health Check
 
 - Method: GET
-- Path: /api/health
+- Path: `/api/health`
 - Response example:
 
 ```json
@@ -105,50 +119,53 @@ Default local URLs:
 }
 ```
 
+### Sitters
+
+- Method: GET
+- Path: `/api/sitters`
+- Returns a list of available sitters, including pet and plant care providers.
+
+### Bookings
+
+- Method: GET
+- Path: `/api/bookings`
+- Returns current bookings.
+
+- Method: POST
+- Path: `/api/bookings`
+- Body: `{ sitterId, ownerName, serviceType, startDate, durationHours }`
+- Creates a new reservation request.
+
 ## Available Scripts
 
-Frontend (inside frontend):
+### Frontend (inside frontend)
 
-- npm run dev: start Vite dev server
-- npm run build: production build
-- npm run preview: preview production build
-- npm run lint: run ESLint checks
-- npm run lint:fix: auto-fix lint issues
-- npm run format: format files with Prettier
-- npm run format:check: verify formatting
+- `npm run dev`: start Vite dev server
+- `npm run build`: create production build
+- `npm run preview`: preview production build
+- `npm run lint`: run ESLint checks
+- `npm run lint:fix`: fix lint issues
+- `npm run format`: format files with Prettier
+- `npm run format:check`: verify formatting
 
-Backend (inside backend):
+### Backend (inside backend)
 
-- npm run dev: start API with nodemon
-- npm run start: start API with node
-- npm run lint: run ESLint checks
-- npm run lint:fix: auto-fix lint issues
-- npm run format: format files with Prettier
-- npm run format:check: verify formatting
+- `npm run dev`: start API with nodemon
+- `npm run start`: start API with node
+- `npm run test`: run backend tests
+- `npm run lint`: run ESLint checks
+- `npm run lint:fix`: fix lint issues
+- `npm run format`: format files with Prettier
+- `npm run format:check`: verify formatting
 
 ## Code Quality
 
-- ESLint is configured separately for frontend (React) and backend (Node.js).
-- Prettier formatting rules are centralized at the repository root.
+- ESLint is configured for frontend and backend code.
+- Prettier formatting is used across the repository.
 
-## Deployment Scope
+## Docker
 
-This project is prepared to continue with:
-
-- Dockerfiles for frontend and backend
-- docker-compose for local container orchestration
-- Cloud deployment (for example: backend on Render/Railway and frontend on Vercel/Netlify)
-
-## Current Status
-
-- Base full-stack structure created
-- Frontend-backend integration working through /api proxy
-- ESLint and Prettier configured
-- Ready for Docker and cloud deployment steps
-
-## Run with Docker
-
-Build and start all services:
+Start both services locally with Docker Compose:
 
 ```bash
 docker compose up -d --build
@@ -171,32 +188,31 @@ Docker URLs:
 - Frontend: http://localhost:5173
 - Backend: http://localhost:4000
 
-## Cloud Deployment (Railway - Single Service)
+## Current Status
 
-This project is configured to deploy frontend and backend together as one Railway service.
+- Core full-stack structure in place
+- PetCare backend supports sitter listing and booking creation
+- Frontend UI updated to browse sitters and submit booking requests
+- Dockerfiles and Docker Compose configured
+- Tests added for production-like backend behavior
+- Prepared for cloud deployment and authentication setup
 
-How it works:
+## Next Steps
 
-- The root Dockerfile  builds the frontend (Vite)
-- The backend serves the built frontend as static files
-- API and UI share the same domain
+- Add authentication for owners and sitters
+- Implement sitter profiles and availability
+- Add booking endpoints and reservation flows
+- Deploy backend and frontend to cloud services
+- Configure production authentication and CORS
+- Add CI workflow to run tests on push to `main`
 
-### Railway Setup
+## Future Product Vision
 
-1. In Railway, create a new project from this GitHub repository.
-2. Keep the deployment at repository root.
-3. Railway will use railway.toml and the root Dockerfile automatically.
-4. After deployment, open:
+PetCare can evolve into a full service marketplace for pet and plant caregivers:
 
-- / for the frontend
-- /api/health for backend health check
-
-Notes:
-
-- PORT is provided automatically by Railway.
-- No separate frontend platform is needed.
-
-## Post-Deploy Verification
+- Owners book sitters by type, availability, and price
+- Sitters manage bookings, schedules, and ratings
+- The app can support multiple service categories and secure sessions
 
 Run an automated smoke test against your public URL:
 
