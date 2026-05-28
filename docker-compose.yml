@@ -6,6 +6,8 @@ services:
     container_name: fullstack-backend
     environment:
       - PORT=4000
+      - NODE_ENV=development
+      - FRONTEND_URL=http://localhost:5173
     ports:
       - "4000:4000"
 

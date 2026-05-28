@@ -125,7 +125,7 @@ Default local URLs:
 - Path: `/api/sitters`
 - Returns a list of available sitters, including pet and plant care providers.
 
-### Bookings
+### Bookings (requires session cookie)
 
 - Method: GET
 - Path: `/api/bookings`
@@ -135,6 +135,14 @@ Default local URLs:
 - Path: `/api/bookings`
 - Body: `{ sitterId, ownerName, serviceType, startDate, durationHours }`
 - Creates a new reservation request.
+
+### Auth
+
+- `POST /api/auth/register` – `{ name, email, password, role }`
+- `POST /api/auth/login` – `{ email, password }`
+- `POST /api/auth/logout`
+- `GET /api/auth/me`
+- `GET /api/auth/protected`
 
 ## Available Scripts
 
@@ -188,23 +196,58 @@ Docker URLs:
 - Frontend: http://localhost:5173
 - Backend: http://localhost:4000
 
+## Authentication
+
+PetCare uses **session cookies** (not `localStorage`):
+
+- `POST /api/auth/register` – create account and start session
+- `POST /api/auth/login` – sign in
+- `POST /api/auth/logout` – end session
+- `GET /api/auth/me` – current user
+- `GET /api/auth/protected` – sample protected route
+
+Bookings (`GET`/`POST /api/bookings`) require a valid session cookie (`petcare_session`, `httpOnly`).
+
+The frontend sends `credentials: 'include'` on every API request via `frontend/src/api.js`.
+
+### Local environment
+
+```bash
+cd backend
+cp .env.example .env
+```
+
+| Variable | Purpose |
+|----------|---------|
+| `PORT` | API port (default `4000`) |
+| `FRONTEND_URL` | Allowed CORS origin(s), comma-separated |
+| `NODE_ENV` | `production` enables `secure` cookies |
+
+## Security checklist (pre-deploy)
+
+1. **Secrets** – only in `.env` / platform env vars (never committed).
+2. **CORS** – restricted to `FRONTEND_URL` (not `*`).
+3. **Tokens** – session ID in `httpOnly` cookie only (no `localStorage`).
+4. **Credentials** – `credentials: 'include'` on all authenticated frontend requests.
+5. **Docker** – `.dockerignore` excludes `.env` and `node_modules`.
+6. **HTTPS** – enabled automatically on most cloud hosts.
+7. **Auth callbacks** – set `FRONTEND_URL` to your deployed frontend URL before go-live.
+
 ## Current Status
 
 - Core full-stack structure in place
-- PetCare backend supports sitter listing and booking creation
-- Frontend UI updated to browse sitters and submit booking requests
+- Session-based authentication with protected bookings
+- CORS locked to configured frontend origin(s)
 - Dockerfiles and Docker Compose configured
-- Tests added for production-like backend behavior
-- Prepared for cloud deployment and authentication setup
+- Backend tests cover auth, CORS, and protected routes
+- CI workflow `deploy.yml` runs lint + tests on push to `main`
 
-## Next Steps
+## Next Steps (before presentation)
 
-- Add authentication for owners and sitters
-- Implement sitter profiles and availability
-- Add booking endpoints and reservation flows
 - Deploy backend and frontend to cloud services
-- Configure production authentication and CORS
-- Add CI workflow to run tests on push to `main`
+- Set `FRONTEND_URL` and `VITE_API_URL` for production
+- Add deployed URLs and reflection answers to this README
+- Dry-run demo: Docker locally + login/logout on deployed URL
 
 ## Future Product Vision
 
