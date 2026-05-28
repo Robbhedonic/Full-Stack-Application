@@ -26,7 +26,6 @@ export default function App() {
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authMessage, setAuthMessage] = useState('');
-  const [authLoading, setAuthLoading] = useState(true);
   const [adminStats, setAdminStats] = useState(null);
 
   function roleLabel(role) {
@@ -77,8 +76,6 @@ export default function App() {
       setAuthUser(response.ok ? data.user : null);
     } catch {
       setAuthUser(null);
-    } finally {
-      setAuthLoading(false);
     }
   }, []);
 

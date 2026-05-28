@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cookieHeaderFromResponse, loginAs, resetTestState, startServer, stopServer } from './helpers.js';
+import { loginAs, resetTestState, startServer, stopServer } from './helpers.js';
 
 test.beforeEach(() => {
   resetTestState();

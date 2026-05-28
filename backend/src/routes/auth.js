@@ -83,7 +83,8 @@ router.post('/login', async (req, res) => {
 
 router.post('/logout', (req, res) => {
   deleteSession(req.cookies?.[SESSION_COOKIE]);
-  const { maxAge: _ignored, ...clearOptions } = sessionCookieOptions();
+  const clearOptions = { ...sessionCookieOptions() };
+  delete clearOptions.maxAge;
   res.clearCookie(SESSION_COOKIE, clearOptions);
   return res.json({ ok: true });
 });
