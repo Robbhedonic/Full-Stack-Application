@@ -1,121 +1,127 @@
 # PetCare
 
-PetCare is a full-stack booking platform for pet and plant care services.
+Full-stack booking platform for pet and plant care services.
 
 - **Frontend:** React + Vite
-- **Backend:** Node.js + Express
-- **Docker:** separate frontend and backend images + `docker-compose.yml`
+- **Backend:** Node.js + Express + Prisma
+- **Database:** PostgreSQL
 
 ## Project structure
 
 ```text
 .
-├── frontend/          # React SPA (PetCare UI)
-├── backend/           # Express REST API
+├── frontend/
+├── backend/
+│   ├── prisma/
+│   │   ├── schema.prisma
+│   │   ├── seed.js
+│   │   └── migrations/
+│   └── src/
 ├── docker-compose.yml
-├── Dockerfile         # optional single-service image (e.g. Railway)
 └── README.md
 ```
 
-## Local development
-
-### Prerequisites
+## Prerequisites
 
 - Node.js 20+
 - npm 10+
-- Docker (optional, for container testing)
+- Docker (PostgreSQL + optional full stack)
 
-### Install
+## Local setup (without Docker)
+
+### 1. Database
+
+Start PostgreSQL (example with Docker):
 
 ```bash
-cd frontend && npm install
-cd ../backend && npm install
-cp backend/.env.example backend/.env
+docker run --name petcare-db -e POSTGRES_USER=petcare -e POSTGRES_PASSWORD=petcare -e POSTGRES_DB=petcare -p 5432:5432 -d postgres:16-alpine
 ```
 
-### Run
-
-Terminal 1 — API:
+### 2. Backend
 
 ```bash
 cd backend
+cp .env.example .env
+npm install
+npx prisma migrate deploy
+npx prisma db seed
 npm run dev
 ```
 
-Terminal 2 — UI:
+### 3. Frontend
 
 ```bash
 cd frontend
+npm install
 npm run dev
 ```
 
-Open **http://localhost:5173/home** (`/` redirects to `/home`).
+Open **http://localhost:5173/home** (admin dashboard: **http://localhost:5173/admin**)
 
-- API: http://localhost:4000
+## Seed users (password for all: `password123`)
 
-## Docker
+| Role | Count | Example login |
+|------|-------|----------------|
+| Admin | 1 | `admin@petcare.test` → `/admin` dashboard |
+| Pet owners | 5 | `jane@petcare.test`, `mike@petcare.test`, `sara@petcare.test`, `tom@petcare.test`, `emma@petcare.test` |
+| Plant owners | 5 | `carlos@petcare.test`, `nina@petcare.test`, `oliver@petcare.test`, `rosa@petcare.test`, `ivy@petcare.test` |
+| Mixed owners | 5 | `alex@petcare.test`, `taylor@petcare.test`, `jordan@petcare.test`, `casey@petcare.test`, `riley@petcare.test` |
+| Caregivers | 5 | `luna@petcare.test`, `diego@petcare.test`, `mia@petcare.test`, `noah@petcare.test`, `zoe@petcare.test` |
 
-Build and run both services:
+**Total: 21 users** (plus sample bookings). All use password `password123`.
 
-```bash
-docker compose up -d --build
-```
-
-| Service  | URL |
-|----------|-----|
-| Frontend | http://localhost:8080 |
-| Backend  | http://localhost:4000 |
-
-Stop:
-
-```bash
-docker compose down
-```
-
-## API endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/health` | Health check |
-| GET | `/api/sitters` | List sitters |
-| GET | `/api/bookings` | List bookings |
-| POST | `/api/bookings` | Create booking |
-
-## Tests
+## Prisma commands
 
 ```bash
 cd backend
-npm test
+
+npm run db:generate    # prisma generate
+npm run db:migrate     # prisma migrate dev
+npm run db:migrate:deploy
+npm run db:seed        # prisma db seed
+npm run db:studio      # Prisma Studio GUI
 ```
 
-## GitHub Actions
-
-- **CI** (`.github/workflows/ci.yml`): lint + frontend build on push/PR.
-- **Post-Deploy Check** (manual): smoke test against your deployed URL.
+## Docker (full stack)
 
 ```bash
-node scripts/postdeploy-check.mjs https://your-deployed-url.example
+docker compose down
+docker compose up -d --build
 ```
 
-## Assignment checklist (final module)
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:8080 |
+| Backend API | http://localhost:4000 |
+| PostgreSQL | localhost:5432 |
 
-| Requirement | Status |
-|-------------|--------|
-| `/backend` + `/frontend` structure | Done |
-| Dockerfiles + docker-compose | Done |
-| Deploy to cloud (URL in README) | TODO — add your live URLs |
-| Auth in production (login/logout) | TODO — mock UI exists; wire real auth + cookies for submission |
-| Tests + 2 production-like tests | Partial — health + booking tests exist |
-| `deploy.yml` CI with tests on `main` | TODO |
-| README: URLs, Docker, reflections | TODO |
+Migrations and seed run automatically when the backend container starts.
 
-## Reflection questions (add before presentation)
+## API endpoints
 
-1. Why did you choose your deployment platform? What alternatives did you consider?
-2. What challenges did you face with Docker? How did you solve them?
-3. How did you handle environment variables and secrets in production vs locally?
-4. What would you do differently if you had one more week?
-5. How did you ensure authentication works after deployment?
+| Method | Path | Auth |
+|--------|------|------|
+| GET | `/api/health` | No |
+| GET | `/api/sitters` | No |
+| POST | `/api/auth/register` | No |
+| POST | `/api/auth/login` | No |
+| POST | `/api/auth/logout` | Session |
+| GET | `/api/auth/me` | Session |
+| GET | `/api/admin/stats` | Admin only |
+| GET | `/api/bookings` | Yes |
+| POST | `/api/bookings` | Yes |
+
+## Tests
+
+Requires PostgreSQL with migrations and seed applied:
+
+```bash
+cd backend
+cp .env.example .env
+npx prisma migrate deploy
+npx prisma db seed
+npm test
+```
 
 ## Deployed URLs
 

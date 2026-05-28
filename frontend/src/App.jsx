@@ -1,11 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
+import { API, apiFetch } from './api.js';
 import { pageToPath, pathToPage } from './routes.js';
-
-const rawApiBase = import.meta.env.VITE_API_URL || '';
-const apiBase = rawApiBase.endsWith('/') ? rawApiBase.slice(0, -1) : rawApiBase;
-const HEALTH_URL = `${apiBase}/api/health`;
-const SITTERS_URL = `${apiBase}/api/sitters`;
-const BOOKINGS_URL = `${apiBase}/api/bookings`;
 
 function formatDate(value) {
   if (!value) return 'Pending';
@@ -31,6 +26,19 @@ export default function App() {
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authMessage, setAuthMessage] = useState('');
+  const [authLoading, setAuthLoading] = useState(true);
+  const [adminStats, setAdminStats] = useState(null);
+
+  function roleLabel(role) {
+    const labels = {
+      'owner-pet': 'Pet owner',
+      'owner-plant': 'Plant owner',
+      'owner-mixed': 'Mixed owner',
+      caregiver: 'Caregiver',
+      admin: 'Admin',
+    };
+    return labels[role] ?? role;
+  }
 
   const navigate = useCallback((page) => {
     const path = pageToPath(page);
@@ -63,25 +71,38 @@ export default function App() {
     return () => window.removeEventListener('popstate', syncFromUrl);
   }, []);
 
+  const loadSession = useCallback(async () => {
+    try {
+      const { response, data } = await apiFetch(API.me);
+      setAuthUser(response.ok ? data.user : null);
+    } catch {
+      setAuthUser(null);
+    } finally {
+      setAuthLoading(false);
+    }
+  }, []);
+
   const loadSitters = useCallback(async () => {
     try {
-      const res = await fetch(SITTERS_URL);
-      const data = await res.json();
+      const { response, data } = await apiFetch(API.sitters);
+      if (!response.ok) throw new Error();
       setSitters(data.sitters || []);
-      setStatus('ready');
-      if (data.sitters.length > 0) {
+      if (data.sitters?.length > 0) {
         setSelectedSitter((previous) => previous || data.sitters[0].id);
       }
-    } catch (error) {
-      setStatus('error');
+    } catch {
       setMessage('Unable to load sitters.');
     }
   }, []);
 
   const loadBookings = useCallback(async () => {
     try {
-      const res = await fetch(BOOKINGS_URL);
-      const data = await res.json();
+      const { response, data } = await apiFetch(API.bookings);
+      if (response.status === 401) {
+        setBookings([]);
+        return;
+      }
+      if (!response.ok) throw new Error();
       setBookings(data.bookings || []);
     } catch {
       setMessage('Unable to load bookings.');
@@ -90,28 +111,53 @@ export default function App() {
 
   const loadHealth = useCallback(async () => {
     try {
-      const res = await fetch(HEALTH_URL);
-      const data = await res.json();
-      setStatus(data.status === 'ok' ? 'ready' : 'offline');
+      const { response, data } = await apiFetch(API.health);
+      setStatus(response.ok && data?.status === 'ok' ? 'ready' : 'offline');
     } catch {
       setStatus('offline');
     }
   }, []);
 
   useEffect(() => {
-    loadSitters();
-    loadBookings();
     loadHealth();
-  }, [loadSitters, loadBookings, loadHealth]);
+    loadSession();
+  }, [loadHealth, loadSession]);
+
+  const loadAdminStats = useCallback(async () => {
+    try {
+      const { response, data } = await apiFetch(API.adminStats);
+      if (!response.ok) throw new Error();
+      setAdminStats(data);
+    } catch {
+      setMessage('Unable to load admin statistics.');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (authUser?.role === 'admin') {
+      if (currentPage === 'dashboard') {
+        navigate('admin');
+      }
+      if (currentPage === 'admin') {
+        loadAdminStats();
+      }
+      return;
+    }
+
+    if (authUser) {
+      loadSitters();
+      loadBookings();
+      if (authUser.name) setOwnerName(authUser.name);
+    }
+  }, [authUser, currentPage, navigate, loadSitters, loadBookings, loadAdminStats]);
 
   async function handleSubmit(event) {
     event.preventDefault();
     setMessage('Creating booking...');
 
     try {
-      const response = await fetch(BOOKINGS_URL, {
+      const { response, data } = await apiFetch(API.bookings, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sitterId: selectedSitter,
           ownerName,
@@ -121,9 +167,8 @@ export default function App() {
         }),
       });
 
-      const data = await response.json();
       if (!response.ok) {
-        setMessage(data.error || 'Booking failed');
+        setMessage(data?.error || 'Booking failed');
         return;
       }
 
@@ -137,25 +182,55 @@ export default function App() {
     }
   }
 
-  function handleAuthSubmit(event) {
+  async function handleAuthSubmit(event) {
     event.preventDefault();
-    const displayName = authMode === 'register' ? authName || authEmail.split('@')[0] : authEmail.split('@')[0];
-    const user = {
-      name: displayName,
-      email: authEmail,
-      role: userType,
-    };
+    setAuthMessage('');
 
-    setAuthUser(user);
-    setAuthMessage(
+    const path = authMode === 'login' ? API.login : API.register;
+    const body =
       authMode === 'login'
-        ? `Welcome back, ${displayName}!`
-        : `Account created for ${displayName}`
-    );
-    setAuthName('');
-    setAuthEmail('');
-    setAuthPassword('');
-    navigate('dashboard');
+        ? { email: authEmail, password: authPassword }
+        : { name: authName, email: authEmail, password: authPassword, role: userType };
+
+    try {
+      const { response, data } = await apiFetch(path, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        setAuthMessage(data?.error || 'Authentication failed');
+        return;
+      }
+
+      setAuthUser(data.user);
+      setAuthMessage(
+        authMode === 'login'
+          ? `Welcome back, ${data.user.name}!`
+          : `Account created for ${data.user.name}`
+      );
+      setAuthName('');
+      setAuthEmail('');
+      setAuthPassword('');
+      navigate(data.user.role === 'admin' ? 'admin' : 'dashboard');
+    } catch {
+      setAuthMessage('Could not connect to the server.');
+    }
+  }
+
+  async function handleLogout() {
+    try {
+      await apiFetch(API.logout, { method: 'POST' });
+    } catch {
+      // ignore
+    }
+    setAuthUser(null);
+    setAdminStats(null);
+    setBookings([]);
+    setSitters([]);
+    setCurrentPage('home');
+    setAuthMessage('');
+    setMessage('');
   }
 
   return (
@@ -231,6 +306,11 @@ export default function App() {
                   ? 'Sign in to access the platform and view sitters and bookings.'
                   : 'Create your account, choose your role, and start managing reservations.'}
               </p>
+              {authMode === 'login' && (
+                <p className="hero-note">
+                  Demo: jane@petcare.test (owner) · admin@petcare.test (admin) · password123
+                </p>
+              )}
               <form onSubmit={handleAuthSubmit} className="auth-form">
                 {authMode === 'register' && (
                   <label>
@@ -281,16 +361,132 @@ export default function App() {
         </article>
       )}
 
+      {currentPage === 'admin' && (
+        <article className="status-card booking-card admin-card">
+          {!authUser || authUser.role !== 'admin' ? (
+            <>
+              <h2>Admin access required</h2>
+              <p>Sign in with an administrator account to view platform statistics.</p>
+              <button type="button" className="action-btn" onClick={() => navigate('login')}>
+                Go to login
+              </button>
+            </>
+          ) : (
+            <>
+              <section className="section-header">
+                <p className="kicker">Admin dashboard</p>
+                <h2>Platform overview</h2>
+                <p>Logged in as {authUser.name}</p>
+              </section>
+
+              <div className="hero-actions">
+                <button type="button" className="back-btn" onClick={() => navigate('home')}>
+                  ← Back to home
+                </button>
+                <button type="button" className="secondary-btn" onClick={loadAdminStats}>
+                  Refresh stats
+                </button>
+                <button type="button" className="secondary-btn" onClick={handleLogout}>
+                  Logout
+                </button>
+              </div>
+
+              {adminStats ? (
+                <>
+                  <section className="admin-stats-grid">
+                    <article className="admin-stat">
+                      <p>Pet owners</p>
+                      <h3>{adminStats.stats.petOwners}</h3>
+                    </article>
+                    <article className="admin-stat">
+                      <p>Plant owners</p>
+                      <h3>{adminStats.stats.plantOwners}</h3>
+                    </article>
+                    <article className="admin-stat">
+                      <p>Mixed owners</p>
+                      <h3>{adminStats.stats.mixedOwners}</h3>
+                    </article>
+                    <article className="admin-stat">
+                      <p>Total owners</p>
+                      <h3>{adminStats.stats.totalOwners}</h3>
+                    </article>
+                    <article className="admin-stat">
+                      <p>Caregivers</p>
+                      <h3>{adminStats.stats.caregivers}</h3>
+                    </article>
+                    <article className="admin-stat">
+                      <p>Sitters listed</p>
+                      <h3>{adminStats.stats.sittersListed}</h3>
+                    </article>
+                    <article className="admin-stat">
+                      <p>Total bookings</p>
+                      <h3>{adminStats.stats.totalBookings}</h3>
+                    </article>
+                    <article className="admin-stat">
+                      <p>Pending bookings</p>
+                      <h3>{adminStats.stats.pendingBookings}</h3>
+                    </article>
+                  </section>
+
+                  <section className="panel">
+                    <h3>Recent users</h3>
+                    <ul className="admin-list">
+                      {adminStats.recentUsers.map((user) => (
+                        <li key={user.id}>
+                          <strong>{user.name}</strong> — {user.email}
+                          <span>{roleLabel(user.role)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+
+                  <section className="panel">
+                    <h3>Recent bookings</h3>
+                    {adminStats.recentBookings.length === 0 ? (
+                      <p>No bookings yet.</p>
+                    ) : (
+                      <ul className="admin-list">
+                        {adminStats.recentBookings.map((booking) => (
+                          <li key={booking.id}>
+                            <strong>{booking.ownerName}</strong> — {booking.serviceType} care
+                            <span>{booking.status}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </section>
+                </>
+              ) : (
+                <p className="hero-note">Loading statistics...</p>
+              )}
+            </>
+          )}
+        </article>
+      )}
+
       {currentPage === 'dashboard' && (
         <article className="status-card booking-card">
+          {!authUser ? (
+            <>
+              <h2>Sign in required</h2>
+              <p>Please sign in to view sitters and manage bookings.</p>
+              <button type="button" className="action-btn" onClick={() => navigate('login')}>
+                Go to login
+              </button>
+            </>
+          ) : (
+            <>
           <section className="section-header">
-            <h2>Welcome{authUser ? `, ${authUser.name}` : ''}</h2>
+            <h2>Welcome, {authUser.name}</h2>
             <p>Browse the marketplace and manage your pet or plant care reservations.</p>
           </section>
 
           <div className="hero-actions">
             <button type="button" className="back-btn" onClick={() => navigate('home')}>
               ← Back to home
+            </button>
+            <button type="button" className="secondary-btn" onClick={handleLogout}>
+              Logout
             </button>
           </div>
 
@@ -381,6 +577,8 @@ export default function App() {
               </ul>
             )}
           </section>
+            </>
+          )}
         </article>
       )}
     </main>

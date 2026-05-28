@@ -3,6 +3,7 @@ const ROUTES = {
   login: '/login',
   register: '/register',
   dashboard: '/dashboard',
+  admin: '/admin',
 };
 
 export function pageToPath(page) {
@@ -22,6 +23,8 @@ export function pathToPage(pathname) {
       return 'register';
     case '/dashboard':
       return 'dashboard';
+    case '/admin':
+      return 'admin';
     default:
       return 'home';
   }

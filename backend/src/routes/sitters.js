@@ -1,16 +1,17 @@
 import { Router } from 'express';
-import { sitters } from '../data.js';
+import { prisma } from '../lib/prisma.js';
+import { serializeSitter } from '../lib/serializers.js';
 
 const router = Router();
 
-router.get('/', (req, res) => {
-  const type = req.query.type;
-  if (!type) {
-    return res.json({ sitters });
-  }
+router.get('/', async (req, res) => {
+  const type = req.query.type?.toString().toLowerCase();
+  const sitters = await prisma.sitterProfile.findMany({
+    where: type ? { type } : undefined,
+    orderBy: { name: 'asc' },
+  });
 
-  const filtered = sitters.filter((sitter) => sitter.type === type.toLowerCase());
-  return res.json({ sitters: filtered });
+  return res.json({ sitters: sitters.map(serializeSitter) });
 });
 
 export default router;

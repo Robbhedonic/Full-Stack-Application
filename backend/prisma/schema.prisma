@@ -1,0 +1,54 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  OWNER_PET
+  OWNER_PLANT
+  OWNER_MIXED
+  CAREGIVER
+  ADMIN
+}
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  passwordHash  String
+  name          String
+  role          UserRole
+  createdAt     DateTime       @default(now())
+  sitterProfile SitterProfile?
+  bookings      Booking[]      @relation("OwnerBookings")
+}
+
+model SitterProfile {
+  id           String    @id @default(cuid())
+  userId       String?   @unique
+  user         User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  name         String
+  type         String
+  rating       Float
+  pricePerHour Int
+  description  String
+  location     String
+  bookings     Booking[]
+}
+
+model Booking {
+  id            String        @id @default(cuid())
+  sitterId      String
+  sitter        SitterProfile @relation(fields: [sitterId], references: [id])
+  ownerId       String?
+  owner         User?         @relation("OwnerBookings", fields: [ownerId], references: [id], onDelete: SetNull)
+  ownerName     String
+  serviceType   String
+  startDate     DateTime
+  durationHours Int
+  status        String        @default("pending")
+  createdAt     DateTime      @default(now())
+}

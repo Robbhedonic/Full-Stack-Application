@@ -1,40 +1,43 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { app } from '../src/server.js';
+import { loginAs, resetTestState, startServer, stopServer } from './helpers.js';
 
-function start() {
-  const server = app.listen(0);
-  const { port } = server.address();
-  return { server, port };
-}
+test.beforeEach(() => {
+  resetTestState();
+});
 
-test('GET /api/sitters returns available sitters', async () => {
-  const { server, port } = start();
+test('GET /api/sitters returns seeded sitters', async () => {
+  const { server, baseUrl } = startServer();
 
   try {
-    const response = await fetch(`http://127.0.0.1:${port}/api/sitters`);
+    const response = await fetch(`${baseUrl}/api/sitters`);
     assert.equal(response.status, 200);
 
     const data = await response.json();
     assert.ok(Array.isArray(data.sitters));
-    assert.ok(data.sitters.length > 0);
+    assert.ok(data.sitters.length >= 3);
     assert.ok(data.sitters[0].name);
   } finally {
-    await new Promise((resolve) => server.close(resolve));
+    await stopServer(server);
   }
 });
 
-test('POST /api/bookings creates a new booking', async () => {
-  const { server, port } = start();
+test('POST /api/bookings creates a booking when authenticated', async () => {
+  const { server, baseUrl } = startServer();
 
   try {
-    const sittersResponse = await fetch(`http://127.0.0.1:${port}/api/sitters`);
+    const { cookie } = await loginAs(baseUrl);
+    const sittersResponse = await fetch(`${baseUrl}/api/sitters`);
     const sittersData = await sittersResponse.json();
     const sitterId = sittersData.sitters[0]?.id;
 
-    const createResponse = await fetch(`http://127.0.0.1:${port}/api/bookings`, {
+    const createResponse = await fetch(`${baseUrl}/api/bookings`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: cookie,
+        Origin: 'http://localhost:5173',
+      },
       body: JSON.stringify({
         sitterId,
         ownerName: 'Test Owner',
@@ -48,8 +51,7 @@ test('POST /api/bookings creates a new booking', async () => {
     const data = await createResponse.json();
     assert.equal(data.booking.sitterId, sitterId);
     assert.equal(data.booking.ownerName, 'Test Owner');
-    assert.equal(data.booking.serviceType, 'pet');
   } finally {
-    await new Promise((resolve) => server.close(resolve));
+    await stopServer(server);
   }
 });

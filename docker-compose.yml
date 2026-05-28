@@ -1,12 +1,35 @@
 services:
+  db:
+    image: postgres:16-alpine
+    container_name: petcare-db
+    environment:
+      POSTGRES_USER: petcare
+      POSTGRES_PASSWORD: petcare
+      POSTGRES_DB: petcare
+    ports:
+      - "5432:5432"
+    volumes:
+      - petcare_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U petcare -d petcare']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   backend:
     build:
       context: ./backend
     container_name: fullstack-backend
     environment:
-      - PORT=4000
+      PORT: 4000
+      NODE_ENV: development
+      FRONTEND_URL: http://localhost:8080,http://localhost:5173
+      DATABASE_URL: postgresql://petcare:petcare@db:5432/petcare
     ports:
       - "4000:4000"
+    depends_on:
+      db:
+        condition: service_healthy
 
   frontend:
     build:
@@ -18,3 +41,6 @@ services:
       - "8080:80"
     depends_on:
       - backend
+
+volumes:
+  petcare_pgdata:
