@@ -202,6 +202,14 @@ You deployed **without PostgreSQL**. Fix in this order:
 
 Your project should show **two services**: the app + PostgreSQL. If you only see one, Postgres is missing.
 
+**"Application failed to respond" (502) after successful deploy:**
+
+The public **target port** must match the port in deploy logs (`API listening on 0.0.0.0:XXXX`).
+
+1. **Deploy Logs** → find `API listening on 0.0.0.0:8080` (or another port)
+2. **Settings → Networking** → edit your domain → set **Target port** to that same number (usually **8080**)
+3. **Redeploy**
+
 **Check deploy logs for:**
 - ✅ `All migrations have been successfully applied`
 - ✅ `Seed complete`

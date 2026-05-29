@@ -42,6 +42,7 @@ test('POST /api/bookings creates a booking when authenticated', async () => {
         sitterId,
         ownerName: 'Test Owner',
         serviceType: 'pet',
+        petType: 'dog',
         startDate: new Date().toISOString(),
         durationHours: 3,
       }),
@@ -51,6 +52,7 @@ test('POST /api/bookings creates a booking when authenticated', async () => {
     const data = await createResponse.json();
     assert.equal(data.booking.sitterId, sitterId);
     assert.equal(data.booking.ownerName, 'Test Owner');
+    assert.equal(data.booking.petType, 'dog');
   } finally {
     await stopServer(server);
   }

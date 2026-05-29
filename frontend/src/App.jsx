@@ -2,10 +2,38 @@ import { useCallback, useEffect, useState } from 'react';
 import { API, apiFetch } from './api.js';
 import { pageToPath, pathToPage } from './routes.js';
 
+const PET_TYPE_OPTIONS = [
+  { value: 'dog', label: 'Dog' },
+  { value: 'cat', label: 'Cat' },
+  { value: 'bird', label: 'Bird' },
+  { value: 'rabbit', label: 'Rabbit' },
+  { value: 'reptile', label: 'Reptile' },
+  { value: 'other', label: 'Other' },
+];
+
+function petTypeLabel(value) {
+  return PET_TYPE_OPTIONS.find((option) => option.value === value)?.label ?? value;
+}
+
 function formatDate(value) {
   if (!value) return 'Pending';
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
+function hoursBetween(startValue, endValue) {
+  const start = new Date(startValue);
+  const end = new Date(endValue);
+  const diffMs = end.getTime() - start.getTime();
+  if (Number.isNaN(diffMs) || diffMs <= 0) return 0;
+  return Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60)));
+}
+
+function formatBookingRange(startValue, durationHours) {
+  const start = new Date(startValue);
+  if (Number.isNaN(start.getTime())) return formatDate(startValue);
+  const end = new Date(start.getTime() + durationHours * 60 * 60 * 1000);
+  return `${start.toLocaleString()} → ${end.toLocaleString()}`;
 }
 
 export default function App() {
@@ -14,9 +42,12 @@ export default function App() {
   const [selectedSitter, setSelectedSitter] = useState('');
   const [ownerName, setOwnerName] = useState('');
   const [serviceType, setServiceType] = useState('pet');
+  const [petType, setPetType] = useState('dog');
   const [startDate, setStartDate] = useState('');
-  const [durationHours, setDurationHours] = useState(2);
+  const [endDate, setEndDate] = useState('');
   const [message, setMessage] = useState('');
+  const [bookingMessage, setBookingMessage] = useState('');
+  const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
   const [status, setStatus] = useState('loading');
   const [currentPage, setCurrentPage] = useState('home');
   const [authUser, setAuthUser] = useState(null);
@@ -148,34 +179,86 @@ export default function App() {
     }
   }, [authUser, currentPage, navigate, loadSitters, loadBookings, loadAdminStats]);
 
+  const filteredSitters = sitters.filter((sitter) => sitter.type === serviceType);
+
+  useEffect(() => {
+    if (filteredSitters.length === 0) {
+      setSelectedSitter('');
+      return;
+    }
+    const stillValid = filteredSitters.some((sitter) => sitter.id === selectedSitter);
+    if (!stillValid) {
+      setSelectedSitter(filteredSitters[0].id);
+    }
+  }, [filteredSitters, selectedSitter, serviceType]);
+
+  function handleServiceTypeChange(nextType) {
+    setServiceType(nextType);
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
-    setMessage('Creating booking...');
+    setBookingMessage('Creating booking...');
+    setIsSubmittingBooking(true);
+
+    if (!selectedSitter) {
+      setBookingMessage('No sitter available for this care type. Try another care type or refresh.');
+      setIsSubmittingBooking(false);
+      return;
+    }
+
+    if (!startDate || !endDate) {
+      setBookingMessage('Pick both a start and an end date/time.');
+      setIsSubmittingBooking(false);
+      return;
+    }
+
+    if (serviceType === 'pet' && !petType) {
+      setBookingMessage('Select a pet type for pet care bookings.');
+      setIsSubmittingBooking(false);
+      return;
+    }
+
+    const durationHours = hoursBetween(startDate, endDate);
+    if (durationHours <= 0) {
+      setBookingMessage('End date/time must be after the start date/time.');
+      setIsSubmittingBooking(false);
+      return;
+    }
 
     try {
       const { response, data } = await apiFetch(API.bookings, {
         method: 'POST',
         body: JSON.stringify({
           sitterId: selectedSitter,
-          ownerName,
+          ownerName: ownerName.trim(),
           serviceType,
+          ...(serviceType === 'pet' ? { petType } : {}),
           startDate,
-          durationHours: Number(durationHours),
+          durationHours,
         }),
       });
 
-      if (!response.ok) {
-        setMessage(data?.error || 'Booking failed');
+      if (response.status === 401) {
+        setBookingMessage('Session expired. Please sign in again.');
+        setAuthUser(null);
+        navigate('login');
         return;
       }
 
-      setMessage('Booking created successfully!');
-      setOwnerName('');
+      if (!response.ok) {
+        setBookingMessage(data?.error || 'Booking failed. Check all fields and try again.');
+        return;
+      }
+
+      setBookingMessage('Booking created successfully!');
       setStartDate('');
-      setDurationHours(2);
+      setEndDate('');
       loadBookings();
     } catch {
-      setMessage('Could not create booking.');
+      setBookingMessage('Could not connect to the server. Try again.');
+    } finally {
+      setIsSubmittingBooking(false);
     }
   }
 
@@ -489,12 +572,12 @@ export default function App() {
 
           <section className="grid-listing">
             <div className="panel">
-              <h3>Available Sitters</h3>
-              {sitters.length === 0 ? (
-                <p>No sitters available yet.</p>
+              <h3>Available Sitters ({serviceType} care)</h3>
+              {filteredSitters.length === 0 ? (
+                <p>No sitters available for {serviceType} care yet.</p>
               ) : (
                 <ul className="sitter-list">
-                  {sitters.map((sitter) => (
+                  {filteredSitters.map((sitter) => (
                     <li key={sitter.id} className="sitter-card">
                       <h4>{sitter.name}</h4>
                       <p>{sitter.description}</p>
@@ -519,36 +602,74 @@ export default function App() {
 
                 <label>
                   Care type
-                  <select value={serviceType} onChange={(e) => setServiceType(e.target.value)}>
+                  <select value={serviceType} onChange={(e) => handleServiceTypeChange(e.target.value)}>
                     <option value="pet">Pet care</option>
                     <option value="plant">Plant care</option>
                   </select>
                 </label>
 
+                {serviceType === 'pet' && (
+                  <label>
+                    Pet type
+                    <select value={petType} onChange={(e) => setPetType(e.target.value)} required>
+                      {PET_TYPE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+
                 <label>
                   Sitter
-                  <select value={selectedSitter} onChange={(e) => setSelectedSitter(e.target.value)}>
-                    {sitters.map((sitter) => (
-                      <option key={sitter.id} value={sitter.id}>
-                        {sitter.name} ({sitter.type})
-                      </option>
-                    ))}
+                  <select value={selectedSitter} onChange={(e) => setSelectedSitter(e.target.value)} required>
+                    {filteredSitters.length === 0 ? (
+                      <option value="">No sitters for this care type</option>
+                    ) : (
+                      filteredSitters.map((sitter) => (
+                        <option key={sitter.id} value={sitter.id}>
+                          {sitter.name} ({sitter.type})
+                        </option>
+                      ))
+                    )}
                   </select>
                 </label>
 
-                <label>
-                  Start date
-                  <input type="datetime-local" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
-                </label>
+                <div className="calendar-range">
+                  <label>
+                    Start
+                    <input
+                      type="datetime-local"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      required
+                    />
+                  </label>
 
-                <label>
-                  Duration (hours)
-                  <input type="number" min="1" value={durationHours} onChange={(e) => setDurationHours(Number(e.target.value))} required />
-                </label>
+                  <label>
+                    End
+                    <input
+                      type="datetime-local"
+                      value={endDate}
+                      min={startDate || undefined}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      required
+                    />
+                  </label>
+                </div>
 
-                <button type="submit" className="action-btn">
-                  Request Care
+                {startDate && endDate && hoursBetween(startDate, endDate) > 0 && (
+                  <p className="booking-duration-note">
+                    Duration: {hoursBetween(startDate, endDate)} hour(s)
+                  </p>
+                )}
+
+                <button type="submit" className="action-btn" disabled={isSubmittingBooking || !selectedSitter}>
+                  {isSubmittingBooking ? 'Submitting...' : 'Request Care'}
                 </button>
+
+                {bookingMessage && <p className="booking-feedback">{bookingMessage}</p>}
               </form>
             </div>
           </section>
@@ -563,9 +684,12 @@ export default function App() {
                   <li key={booking.id} className="booking-card">
                     <div>
                       <strong>{booking.ownerName}</strong> booked <strong>{booking.serviceType}</strong>
+                      {booking.petType ? (
+                        <span> ({petTypeLabel(booking.petType)})</span>
+                      ) : null}
                     </div>
                     <div className="booking-meta">
-                      <span>{formatDate(booking.startDate)}</span>
+                      <span>{formatBookingRange(booking.startDate, booking.durationHours)}</span>
                       <span>{booking.durationHours} hrs</span>
                       <span>{booking.status}</span>
                     </div>

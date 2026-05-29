@@ -152,14 +152,14 @@ async function seedBookings() {
   if (owners.length === 0 || sitters.length === 0) return;
 
   const samples = [
-    { serviceType: 'pet', status: 'pending', daysAhead: 2, hours: 3 },
-    { serviceType: 'pet', status: 'confirmed', daysAhead: 5, hours: 4 },
-    { serviceType: 'plant', status: 'pending', daysAhead: 3, hours: 2 },
-    { serviceType: 'plant', status: 'completed', daysAhead: -2, hours: 2 },
-    { serviceType: 'pet', status: 'pending', daysAhead: 7, hours: 5 },
-    { serviceType: 'plant', status: 'confirmed', daysAhead: 4, hours: 3 },
-    { serviceType: 'pet', status: 'pending', daysAhead: 1, hours: 2 },
-    { serviceType: 'plant', status: 'pending', daysAhead: 6, hours: 4 },
+    { serviceType: 'pet', petType: 'dog', status: 'pending', daysAhead: 2, hours: 3 },
+    { serviceType: 'pet', petType: 'cat', status: 'confirmed', daysAhead: 5, hours: 4 },
+    { serviceType: 'plant', petType: null, status: 'pending', daysAhead: 3, hours: 2 },
+    { serviceType: 'plant', petType: null, status: 'completed', daysAhead: -2, hours: 2 },
+    { serviceType: 'pet', petType: 'dog', status: 'pending', daysAhead: 7, hours: 5 },
+    { serviceType: 'plant', petType: null, status: 'confirmed', daysAhead: 4, hours: 3 },
+    { serviceType: 'pet', petType: 'cat', status: 'pending', daysAhead: 1, hours: 2 },
+    { serviceType: 'plant', petType: null, status: 'pending', daysAhead: 6, hours: 4 },
   ];
 
   for (let i = 0; i < samples.length; i += 1) {
@@ -183,6 +183,7 @@ async function seedBookings() {
         sitterId: sitter.id,
         ownerName: owner.name,
         serviceType: sample.serviceType,
+        petType: sample.petType,
         startDate: new Date(Date.now() + sample.daysAhead * 24 * 60 * 60 * 1000),
         durationHours: sample.hours,
         status: sample.status,

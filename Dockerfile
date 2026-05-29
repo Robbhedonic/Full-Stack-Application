@@ -23,6 +23,6 @@ COPY --from=frontend-build /app/frontend/dist ./public
 RUN npx prisma generate
 
 ENV NODE_ENV=production
-EXPOSE 4000
+EXPOSE 8080
 
 CMD ["npm", "start"]

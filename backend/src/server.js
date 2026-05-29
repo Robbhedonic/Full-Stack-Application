@@ -12,7 +12,7 @@ import bookingsRouter from './routes/bookings.js';
 import adminRouter from './routes/admin.js';
 
 export const app = express();
-const port = Number(process.env.PORT || 4000);
+const port = Number(process.env.PORT || 8080);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const publicDir = path.resolve(__dirname, '../public');

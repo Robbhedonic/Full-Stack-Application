@@ -16,6 +16,7 @@ export function serializeBooking(booking) {
     sitterId: booking.sitterId,
     ownerName: booking.ownerName,
     serviceType: booking.serviceType,
+    petType: booking.petType,
     startDate: booking.startDate.toISOString(),
     durationHours: booking.durationHours,
     status: booking.status,

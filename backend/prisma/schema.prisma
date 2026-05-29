@@ -47,6 +47,7 @@ model Booking {
   owner         User?         @relation("OwnerBookings", fields: [ownerId], references: [id], onDelete: SetNull)
   ownerName     String
   serviceType   String
+  petType       String?
   startDate     DateTime
   durationHours Int
   status        String        @default("pending")
