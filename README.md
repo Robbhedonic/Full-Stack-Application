@@ -184,19 +184,30 @@ Open the app:
 - Home: `https://YOUR-APP.up.railway.app/home`
 - Admin: `https://YOUR-APP.up.railway.app/admin` (`admin@petcare.test` / `password123`)
 
-Migrations and seed run automatically on each container start.
+Migrations and seed run in Railway's **pre-deploy** step (`railway.toml`), then the server starts with `npm start`.
 
 ### Troubleshooting
 
-**Healthcheck failure** (deploy fails at “Network › Healthcheck”):
+**"DATABASE_URL is not set" / Prisma P1012 / Healthcheck failure:**
 
-1. **Link PostgreSQL** — open the web service → **Variables** → ensure `DATABASE_URL` references the Postgres plugin (not empty).
-2. **Set `FRONTEND_URL`** — use `https://${{RAILWAY_PUBLIC_DOMAIN}}` on the web service.
-3. **Generate a public domain** — Settings → Networking → **Generate Domain**.
-4. **Check deploy logs** — look for `Migration attempt` errors or `Can't reach database server`.
-5. **Redeploy** after fixing variables (Railway → **Deploy → Redeploy**).
+You deployed **without PostgreSQL**. Fix in this order:
 
-The app starts the API first so `/api/health` responds while migrations run. If migrations fail after 30 retries, check `DATABASE_URL` and Postgres status.
+1. **Stop redeploying** until Postgres exists — redeploy alone will not fix it.
+2. Project → **+ New → Database → Add PostgreSQL**.
+3. Open your **web app service** (not Postgres) → **Variables**.
+4. **+ New Variable → Add variable reference** → pick PostgreSQL → `DATABASE_URL`.
+5. Add `NODE_ENV=production` and `FRONTEND_URL=https://${{RAILWAY_PUBLIC_DOMAIN}}`.
+6. **Settings → Networking → Generate Domain**.
+7. **Deploy → Redeploy**.
+
+Your project should show **two services**: the app + PostgreSQL. If you only see one, Postgres is missing.
+
+**Check deploy logs for:**
+- ✅ `All migrations have been successfully applied`
+- ✅ `Seed complete`
+- ✅ `API listening on 0.0.0.0:...`
+- ❌ `P1012` → `DATABASE_URL` not linked
+- ❌ `Can't reach database server` → Postgres not running or not linked
 
 ### 6. GitHub Actions smoke test (optional)
 

@@ -5,7 +5,6 @@ COPY frontend/package*.json ./
 RUN npm ci
 
 COPY frontend/. ./
-# Empty VITE_API_URL → same-origin /api/* on Railway monolith
 ENV VITE_API_URL=
 RUN npm run build
 
@@ -26,4 +25,4 @@ RUN npx prisma generate
 ENV NODE_ENV=production
 EXPOSE 4000
 
-CMD ["sh", "-c", "npx prisma migrate deploy && npx prisma db seed && npm start"]
+CMD ["npm", "start"]

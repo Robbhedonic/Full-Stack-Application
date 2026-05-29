@@ -53,8 +53,8 @@ if (existsSync(publicDir)) {
 }
 
 export function startServer() {
-  return app.listen(port, () => {
-    console.log(`API listening on http://localhost:${port}`);
+  return app.listen(port, '0.0.0.0', () => {
+    console.log(`API listening on 0.0.0.0:${port}`);
   });
 }
 
