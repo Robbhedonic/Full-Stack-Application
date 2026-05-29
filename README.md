@@ -130,9 +130,64 @@ npx prisma db seed
 npm test
 ```
 
+## Deploy on Railway
+
+PetCare deploys as a **single service** (frontend + API on one URL). Railway uses the root `Dockerfile` and `railway.toml`.
+
+### 1. Create the project
+
+1. Go to [railway.app](https://railway.app) and sign in with GitHub.
+2. **New Project → Deploy from GitHub repo** → select this repository.
+3. Railway detects `railway.toml` and builds with the root `Dockerfile`.
+
+### 2. Add PostgreSQL
+
+1. In the project, click **+ New → Database → PostgreSQL**.
+2. Open your **web service** → **Variables** → **Add variable reference** (or **Connect** the Postgres plugin).
+3. Link `DATABASE_URL` from the Postgres service (Railway sets this automatically when linked).
+
+### 3. Set environment variables
+
+On the **web service** (not the database), add:
+
+| Variable | Value |
+|----------|--------|
+| `NODE_ENV` | `production` |
+| `DATABASE_URL` | Reference from Postgres plugin |
+| `FRONTEND_URL` | `https://${{RAILWAY_PUBLIC_DOMAIN}}` |
+
+Railway injects `PORT` and `RAILWAY_PUBLIC_DOMAIN` for you.
+
+### 4. Public URL
+
+1. Open the web service → **Settings → Networking**.
+2. Click **Generate Domain** (e.g. `petcare-production.up.railway.app`).
+3. Redeploy if needed after changing `FRONTEND_URL`.
+
+### 5. Verify deployment
+
+```bash
+# Health check
+curl https://YOUR-APP.up.railway.app/api/health
+
+# Smoke test (from repo root)
+node scripts/postdeploy-check.mjs https://YOUR-APP.up.railway.app
+```
+
+Open the app:
+
+- Home: `https://YOUR-APP.up.railway.app/home`
+- Admin: `https://YOUR-APP.up.railway.app/admin` (`admin@petcare.test` / `password123`)
+
+Migrations and seed run automatically on each container start.
+
+### 6. GitHub Actions smoke test (optional)
+
+After deploy, run **Actions → Post-Deploy Check → Run workflow** and paste your Railway URL.
+
 ## Deployed URLs
 
 _Add after deployment:_
 
-- Frontend:
-- Backend:
+- App (frontend + API): https://YOUR-APP.up.railway.app
+- Health: https://YOUR-APP.up.railway.app/api/health

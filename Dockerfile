@@ -2,19 +2,28 @@ FROM node:22-alpine AS frontend-build
 WORKDIR /app/frontend
 
 COPY frontend/package*.json ./
-RUN npm install
+RUN npm ci
 
 COPY frontend/. ./
+# Empty VITE_API_URL → same-origin /api/* on Railway monolith
+ENV VITE_API_URL=
 RUN npm run build
 
 FROM node:22-alpine AS backend-runtime
 WORKDIR /app/backend
 
-COPY backend/package*.json ./
-RUN npm install --omit=dev
+RUN apk add --no-cache openssl
 
-COPY backend/. ./
+COPY backend/package*.json ./
+COPY backend/prisma ./prisma/
+RUN npm ci
+
+COPY backend/. .
 COPY --from=frontend-build /app/frontend/dist ./public
 
+RUN npx prisma generate
+
+ENV NODE_ENV=production
 EXPOSE 4000
-CMD ["npm", "start"]
+
+CMD ["sh", "-c", "npx prisma migrate deploy && npx prisma db seed && npm start"]
