@@ -140,11 +140,16 @@ PetCare deploys as a **single service** (frontend + API on one URL). Railway use
 2. **New Project → Deploy from GitHub repo** → select this repository.
 3. Railway detects `railway.toml` and builds with the root `Dockerfile`.
 
-### 2. Add PostgreSQL
+### 2. Add PostgreSQL (required)
 
-1. In the project, click **+ New → Database → PostgreSQL**.
-2. Open your **web service** → **Variables** → **Add variable reference** (or **Connect** the Postgres plugin).
-3. Link `DATABASE_URL` from the Postgres service (Railway sets this automatically when linked).
+The app **will not start** without a database. If deploy fails at **Healthcheck**, you likely skipped this step.
+
+1. In the Railway project, click **+ New → Database → Add PostgreSQL**.
+2. Wait until the Postgres service shows **Active**.
+3. Open your **web service** (PetCare app, not Postgres).
+4. Go to **Variables → + New variable → Add variable reference**.
+5. Select the **PostgreSQL** service and choose **`DATABASE_URL`**.
+6. Confirm the web service now shows `DATABASE_URL` (value hidden, linked to Postgres).
 
 ### 3. Set environment variables
 
@@ -180,6 +185,18 @@ Open the app:
 - Admin: `https://YOUR-APP.up.railway.app/admin` (`admin@petcare.test` / `password123`)
 
 Migrations and seed run automatically on each container start.
+
+### Troubleshooting
+
+**Healthcheck failure** (deploy fails at “Network › Healthcheck”):
+
+1. **Link PostgreSQL** — open the web service → **Variables** → ensure `DATABASE_URL` references the Postgres plugin (not empty).
+2. **Set `FRONTEND_URL`** — use `https://${{RAILWAY_PUBLIC_DOMAIN}}` on the web service.
+3. **Generate a public domain** — Settings → Networking → **Generate Domain**.
+4. **Check deploy logs** — look for `Migration attempt` errors or `Can't reach database server`.
+5. **Redeploy** after fixing variables (Railway → **Deploy → Redeploy**).
+
+The app starts the API first so `/api/health` responds while migrations run. If migrations fail after 30 retries, check `DATABASE_URL` and Postgres status.
 
 ### 6. GitHub Actions smoke test (optional)
 
