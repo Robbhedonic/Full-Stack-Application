@@ -283,6 +283,35 @@ dd {
   max-width: 100%;
 }
 
+.dashboard-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  grid-template-columns: 1fr;
+  width: min(100%, 900px);
+}
+
+.dashboard-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.dashboard-actions {
+  margin-top: 0;
+}
+
+.booking-form-panel {
+  max-width: 560px;
+}
+
+.booking-form-panel .booking-form {
+  width: 100%;
+  min-width: 0;
+}
+
 .hero-segment {
   gap: 1.8rem;
 }
@@ -388,6 +417,8 @@ dd {
 .booking-form {
   display: grid;
   gap: 1rem;
+  width: 100%;
+  min-width: 0;
 }
 
 .auth-form label,
@@ -396,6 +427,7 @@ dd {
   gap: 0.4rem;
   font-size: 0.95rem;
   color: var(--text-main);
+  min-width: 0;
 }
 
 .auth-form input,
@@ -403,6 +435,8 @@ dd {
 .booking-form select,
 .auth-form select {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   border-radius: 16px;
   border: 1px solid rgba(15, 45, 58, 0.16);
   padding: 0.85rem 1rem;
@@ -413,8 +447,19 @@ dd {
 
 .calendar-range {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: 1fr 1fr;
   gap: 1rem;
+  min-width: 0;
+}
+
+@media (max-width: 560px) {
+  .calendar-range {
+    grid-template-columns: 1fr;
+  }
+
+  .booking-form-panel {
+    max-width: 100%;
+  }
 }
 
 .booking-duration-note {
@@ -502,6 +547,9 @@ dd {
   border: 1px solid rgba(15, 45, 58, 0.12);
   border-radius: 24px;
   padding: 1.4rem;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .panel h2,
@@ -519,7 +567,7 @@ dd {
 }
 
 .sitter-card,
-.booking-card {
+.booking-item {
   background: rgba(255, 255, 255, 0.88);
   border: 1px solid rgba(15, 45, 58, 0.08);
   border-radius: 18px;
@@ -540,14 +588,11 @@ dd {
   font-size: 0.95rem;
 }
 
-.booking-card div {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  align-items: center;
+.booking-item-main {
+  line-height: 1.5;
 }
 
-.booking-card strong {
+.booking-item strong {
   color: var(--text-main);
 }
 

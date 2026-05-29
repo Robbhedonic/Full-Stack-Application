@@ -557,7 +557,7 @@ export default function App() {
       )}
 
       {currentPage === 'dashboard' && (
-        <article className="status-card booking-card">
+        <article className="status-card dashboard-page">
           {!authUser ? (
             <>
               <h2>Sign in required</h2>
@@ -577,7 +577,7 @@ export default function App() {
             </p>
           </section>
 
-          <div className="hero-actions">
+          <div className="hero-actions dashboard-actions">
             <button type="button" className="back-btn" onClick={() => navigate('home')}>
               ← Back to home
             </button>
@@ -586,152 +586,152 @@ export default function App() {
             </button>
           </div>
 
-          <section className="grid-listing">
-            {isOwnerRole(authUser.role) && (
-            <>
-            <div className="panel">
-              <h3>Available Sitters ({serviceType} care)</h3>
-              {filteredSitters.length === 0 ? (
-                <p>No sitters available for {serviceType} care yet.</p>
+          <div className="dashboard-stack">
+            <section className="panel bookings-panel">
+              <h3>{isCaregiverRole(authUser.role) ? 'Clients who booked you' : 'Your reservations'}</h3>
+              {bookings.length === 0 ? (
+                <p>
+                  {isCaregiverRole(authUser.role)
+                    ? 'No one has booked your services yet.'
+                    : 'No bookings yet. Create your first care request below.'}
+                </p>
               ) : (
-                <ul className="sitter-list">
-                  {filteredSitters.map((sitter) => (
-                    <li key={sitter.id} className="sitter-card">
-                      <h4>{sitter.name}</h4>
-                      <p>{sitter.description}</p>
-                      <div className="sitter-meta">
-                        <span>{sitter.type} care</span>
-                        <span>{sitter.location}</span>
-                        <span>${sitter.pricePerHour}/hr</span>
+                <ul className="booking-list">
+                  {bookings.map((booking) => (
+                    <li key={booking.id} className="booking-item">
+                      <div className="booking-item-main">
+                        {isCaregiverRole(authUser.role) ? (
+                          <>
+                            <strong>{booking.ownerName}</strong> booked you for{' '}
+                            <strong>{booking.serviceType}</strong> care
+                          </>
+                        ) : (
+                          <>
+                            You booked <strong>{booking.sitterName || 'a sitter'}</strong> for{' '}
+                            <strong>{booking.serviceType}</strong> care
+                          </>
+                        )}
+                        {booking.petType ? (
+                          <span> ({petTypeLabel(booking.petType)})</span>
+                        ) : null}
+                      </div>
+                      <div className="booking-meta">
+                        <span>{formatBookingRange(booking.startDate, booking.durationHours)}</span>
+                        <span>{booking.durationHours} hrs</span>
+                        <span>{booking.status}</span>
                       </div>
                     </li>
                   ))}
                 </ul>
               )}
-            </div>
+            </section>
 
-            <div className="panel">
-              <h3>Book a sitter</h3>
-              <form onSubmit={handleSubmit} className="booking-form">
-                <label>
-                  Owner name
-                  <input value={ownerName} onChange={(e) => setOwnerName(e.target.value)} placeholder="Your full name" required />
-                </label>
-
-                <label>
-                  Care type
-                  <select value={serviceType} onChange={(e) => handleServiceTypeChange(e.target.value)}>
-                    <option value="pet">Pet care</option>
-                    <option value="plant">Plant care</option>
-                  </select>
-                </label>
-
-                {serviceType === 'pet' && (
-                  <label>
-                    Pet type
-                    <select value={petType} onChange={(e) => setPetType(e.target.value)} required>
-                      {PET_TYPE_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
+            {isOwnerRole(authUser.role) && (
+              <>
+                <section className="panel">
+                  <h3>Available sitters ({serviceType} care)</h3>
+                  {filteredSitters.length === 0 ? (
+                    <p>No sitters available for {serviceType} care yet.</p>
+                  ) : (
+                    <ul className="sitter-list">
+                      {filteredSitters.map((sitter) => (
+                        <li key={sitter.id} className="sitter-card">
+                          <h4>{sitter.name}</h4>
+                          <p>{sitter.description}</p>
+                          <div className="sitter-meta">
+                            <span>{sitter.type} care</span>
+                            <span>{sitter.location}</span>
+                            <span>${sitter.pricePerHour}/hr</span>
+                          </div>
+                        </li>
                       ))}
-                    </select>
-                  </label>
-                )}
+                    </ul>
+                  )}
+                </section>
 
-                <label>
-                  Sitter
-                  <select value={selectedSitter} onChange={(e) => setSelectedSitter(e.target.value)} required>
-                    {filteredSitters.length === 0 ? (
-                      <option value="">No sitters for this care type</option>
-                    ) : (
-                      filteredSitters.map((sitter) => (
-                        <option key={sitter.id} value={sitter.id}>
-                          {sitter.name} ({sitter.type})
-                        </option>
-                      ))
+                <section className="panel booking-form-panel">
+                  <h3>New booking</h3>
+                  <form onSubmit={handleSubmit} className="booking-form">
+                    <label>
+                      Owner name
+                      <input value={ownerName} onChange={(e) => setOwnerName(e.target.value)} placeholder="Your full name" required />
+                    </label>
+
+                    <label>
+                      Care type
+                      <select value={serviceType} onChange={(e) => handleServiceTypeChange(e.target.value)}>
+                        <option value="pet">Pet care</option>
+                        <option value="plant">Plant care</option>
+                      </select>
+                    </label>
+
+                    {serviceType === 'pet' && (
+                      <label>
+                        Pet type
+                        <select value={petType} onChange={(e) => setPetType(e.target.value)} required>
+                          {PET_TYPE_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
                     )}
-                  </select>
-                </label>
 
-                <div className="calendar-range">
-                  <label>
-                    Start
-                    <input
-                      type="datetime-local"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      required
-                    />
-                  </label>
+                    <label>
+                      Sitter
+                      <select value={selectedSitter} onChange={(e) => setSelectedSitter(e.target.value)} required>
+                        {filteredSitters.length === 0 ? (
+                          <option value="">No sitters for this care type</option>
+                        ) : (
+                          filteredSitters.map((sitter) => (
+                            <option key={sitter.id} value={sitter.id}>
+                              {sitter.name} ({sitter.type})
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </label>
 
-                  <label>
-                    End
-                    <input
-                      type="datetime-local"
-                      value={endDate}
-                      min={startDate || undefined}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      required
-                    />
-                  </label>
-                </div>
+                    <div className="calendar-range">
+                      <label>
+                        Start
+                        <input
+                          type="datetime-local"
+                          value={startDate}
+                          onChange={(e) => setStartDate(e.target.value)}
+                          required
+                        />
+                      </label>
 
-                {startDate && endDate && hoursBetween(startDate, endDate) > 0 && (
-                  <p className="booking-duration-note">
-                    Duration: {hoursBetween(startDate, endDate)} hour(s)
-                  </p>
-                )}
-
-                <button type="submit" className="action-btn" disabled={isSubmittingBooking || !selectedSitter}>
-                  {isSubmittingBooking ? 'Submitting...' : 'Request Care'}
-                </button>
-
-                {bookingMessage && <p className="booking-feedback">{bookingMessage}</p>}
-              </form>
-            </div>
-            </>
-            )}
-          </section>
-
-          <section className="panel bookings-panel">
-            <h3>{isCaregiverRole(authUser.role) ? 'Clients who booked you' : 'Your reservations'}</h3>
-            {bookings.length === 0 ? (
-              <p>
-                {isCaregiverRole(authUser.role)
-                  ? 'No one has booked your services yet.'
-                  : 'No bookings yet. Create your first care request.'}
-              </p>
-            ) : (
-              <ul className="booking-list">
-                {bookings.map((booking) => (
-                  <li key={booking.id} className="booking-card">
-                    <div>
-                      {isCaregiverRole(authUser.role) ? (
-                        <>
-                          <strong>{booking.ownerName}</strong> booked you for{' '}
-                          <strong>{booking.serviceType}</strong> care
-                        </>
-                      ) : (
-                        <>
-                          You booked <strong>{booking.sitterName || 'a sitter'}</strong> for{' '}
-                          <strong>{booking.serviceType}</strong> care
-                        </>
-                      )}
-                      {booking.petType ? (
-                        <span> ({petTypeLabel(booking.petType)})</span>
-                      ) : null}
+                      <label>
+                        End
+                        <input
+                          type="datetime-local"
+                          value={endDate}
+                          min={startDate || undefined}
+                          onChange={(e) => setEndDate(e.target.value)}
+                          required
+                        />
+                      </label>
                     </div>
-                    <div className="booking-meta">
-                      <span>{formatBookingRange(booking.startDate, booking.durationHours)}</span>
-                      <span>{booking.durationHours} hrs</span>
-                      <span>{booking.status}</span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+
+                    {startDate && endDate && hoursBetween(startDate, endDate) > 0 && (
+                      <p className="booking-duration-note">
+                        Duration: {hoursBetween(startDate, endDate)} hour(s)
+                      </p>
+                    )}
+
+                    <button type="submit" className="action-btn" disabled={isSubmittingBooking || !selectedSitter}>
+                      {isSubmittingBooking ? 'Submitting...' : 'Request Care'}
+                    </button>
+
+                    {bookingMessage && <p className="booking-feedback">{bookingMessage}</p>}
+                  </form>
+                </section>
+              </>
             )}
-          </section>
+          </div>
             </>
           )}
         </article>
