@@ -26,6 +26,9 @@ router.get('/stats', async (_req, res) => {
       prisma.booking.findMany({
         orderBy: { createdAt: 'desc' },
         take: 8,
+        include: {
+          sitter: { select: { name: true } },
+        },
       }),
     ]);
 

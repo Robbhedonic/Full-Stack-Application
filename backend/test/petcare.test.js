@@ -57,3 +57,121 @@ test('POST /api/bookings creates a booking when authenticated', async () => {
     await stopServer(server);
   }
 });
+
+test('GET /api/bookings returns only the signed-in owner bookings', async () => {
+  const { server, baseUrl } = startServer();
+
+  try {
+    const jane = await loginAs(baseUrl, 'jane@petcare.test');
+    const mike = await loginAs(baseUrl, 'mike@petcare.test');
+
+    const sittersResponse = await fetch(`${baseUrl}/api/sitters`);
+    const sitterId = (await sittersResponse.json()).sitters[0]?.id;
+
+    await fetch(`${baseUrl}/api/bookings`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: jane.cookie,
+        Origin: 'http://localhost:5173',
+      },
+      body: JSON.stringify({
+        sitterId,
+        ownerName: 'Jane Doe',
+        serviceType: 'pet',
+        petType: 'cat',
+        startDate: new Date().toISOString(),
+        durationHours: 2,
+      }),
+    });
+
+    const janeBookings = await fetch(`${baseUrl}/api/bookings`, {
+      headers: { Cookie: jane.cookie, Origin: 'http://localhost:5173' },
+    });
+    const janeData = await janeBookings.json();
+    assert.ok(janeData.bookings.some((booking) => booking.petType === 'cat'));
+    assert.ok(janeData.bookings.every((booking) => booking.ownerName !== 'Mike Sullivan'));
+
+    const mikeBookings = await fetch(`${baseUrl}/api/bookings`, {
+      headers: { Cookie: mike.cookie, Origin: 'http://localhost:5173' },
+    });
+    const mikeData = await mikeBookings.json();
+    assert.ok(mikeData.bookings.every((booking) => booking.ownerName !== 'Jane Doe' || booking.petType !== 'cat'));
+    assert.ok(!mikeData.bookings.some((booking) => booking.petType === 'cat' && booking.ownerName === 'Jane Doe'));
+  } finally {
+    await stopServer(server);
+  }
+});
+
+test('GET /api/bookings lets caregivers see reservations for their sitter profile', async () => {
+  const { server, baseUrl } = startServer();
+
+  try {
+    const owner = await loginAs(baseUrl, 'jane@petcare.test');
+    const caregiver = await loginAs(baseUrl, 'luna@petcare.test');
+
+    const sittersResponse = await fetch(`${baseUrl}/api/sitters`);
+    const sitters = (await sittersResponse.json()).sitters;
+    const lunaSitter = sitters.find((sitter) => sitter.name === 'Luna Morales');
+    assert.ok(lunaSitter);
+
+    await fetch(`${baseUrl}/api/bookings`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: owner.cookie,
+        Origin: 'http://localhost:5173',
+      },
+      body: JSON.stringify({
+        sitterId: lunaSitter.id,
+        ownerName: 'Jane Doe',
+        serviceType: 'pet',
+        petType: 'dog',
+        startDate: new Date().toISOString(),
+        durationHours: 4,
+      }),
+    });
+
+    const caregiverBookings = await fetch(`${baseUrl}/api/bookings`, {
+      headers: { Cookie: caregiver.cookie, Origin: 'http://localhost:5173' },
+    });
+
+    assert.equal(caregiverBookings.status, 200);
+    const data = await caregiverBookings.json();
+    assert.ok(data.bookings.some((booking) => booking.ownerName === 'Jane Doe'));
+    assert.ok(data.bookings.every((booking) => booking.sitterId === lunaSitter.id));
+  } finally {
+    await stopServer(server);
+  }
+});
+
+test('POST /api/bookings rejects caregivers creating bookings', async () => {
+  const { server, baseUrl } = startServer();
+
+  try {
+    const { cookie } = await loginAs(baseUrl, 'luna@petcare.test');
+    const sittersResponse = await fetch(`${baseUrl}/api/sitters`);
+    const sitterId = (await sittersResponse.json()).sitters[0]?.id;
+
+    const response = await fetch(`${baseUrl}/api/bookings`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: cookie,
+        Origin: 'http://localhost:5173',
+      },
+      body: JSON.stringify({
+        sitterId,
+        ownerName: 'Luna',
+        serviceType: 'pet',
+        petType: 'dog',
+        startDate: new Date().toISOString(),
+        durationHours: 2,
+      }),
+    });
+
+    assert.equal(response.status, 403);
+  } finally {
+    await stopServer(server);
+  }
+});

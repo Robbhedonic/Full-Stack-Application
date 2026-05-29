@@ -15,6 +15,14 @@ function petTypeLabel(value) {
   return PET_TYPE_OPTIONS.find((option) => option.value === value)?.label ?? value;
 }
 
+function isOwnerRole(role) {
+  return ['owner-pet', 'owner-plant', 'owner-mixed'].includes(role);
+}
+
+function isCaregiverRole(role) {
+  return role === 'caregiver';
+}
+
 function formatDate(value) {
   if (!value) return 'Pending';
   const date = new Date(value);
@@ -173,9 +181,11 @@ export default function App() {
     }
 
     if (authUser) {
-      loadSitters();
       loadBookings();
       if (authUser.name) setOwnerName(authUser.name);
+      if (isOwnerRole(authUser.role)) {
+        loadSitters();
+      }
     }
   }, [authUser, currentPage, navigate, loadSitters, loadBookings, loadAdminStats]);
 
@@ -528,7 +538,9 @@ export default function App() {
                       <ul className="admin-list">
                         {adminStats.recentBookings.map((booking) => (
                           <li key={booking.id}>
-                            <strong>{booking.ownerName}</strong> — {booking.serviceType} care
+                            <strong>{booking.ownerName}</strong> → {booking.sitterName || 'sitter'} —{' '}
+                            {booking.serviceType} care
+                            {booking.petType ? ` (${petTypeLabel(booking.petType)})` : ''}
                             <span>{booking.status}</span>
                           </li>
                         ))}
@@ -558,7 +570,11 @@ export default function App() {
             <>
           <section className="section-header">
             <h2>Welcome, {authUser.name}</h2>
-            <p>Browse the marketplace and manage your pet or plant care reservations.</p>
+            <p>
+              {isCaregiverRole(authUser.role)
+                ? 'View owners who booked your care services.'
+                : 'Browse the marketplace and manage your pet or plant care reservations.'}
+            </p>
           </section>
 
           <div className="hero-actions">
@@ -571,6 +587,8 @@ export default function App() {
           </div>
 
           <section className="grid-listing">
+            {isOwnerRole(authUser.role) && (
+            <>
             <div className="panel">
               <h3>Available Sitters ({serviceType} care)</h3>
               {filteredSitters.length === 0 ? (
@@ -672,18 +690,34 @@ export default function App() {
                 {bookingMessage && <p className="booking-feedback">{bookingMessage}</p>}
               </form>
             </div>
+            </>
+            )}
           </section>
 
           <section className="panel bookings-panel">
-            <h3>Your reservations</h3>
+            <h3>{isCaregiverRole(authUser.role) ? 'Clients who booked you' : 'Your reservations'}</h3>
             {bookings.length === 0 ? (
-              <p>No bookings yet. Create your first care request.</p>
+              <p>
+                {isCaregiverRole(authUser.role)
+                  ? 'No one has booked your services yet.'
+                  : 'No bookings yet. Create your first care request.'}
+              </p>
             ) : (
               <ul className="booking-list">
                 {bookings.map((booking) => (
                   <li key={booking.id} className="booking-card">
                     <div>
-                      <strong>{booking.ownerName}</strong> booked <strong>{booking.serviceType}</strong>
+                      {isCaregiverRole(authUser.role) ? (
+                        <>
+                          <strong>{booking.ownerName}</strong> booked you for{' '}
+                          <strong>{booking.serviceType}</strong> care
+                        </>
+                      ) : (
+                        <>
+                          You booked <strong>{booking.sitterName || 'a sitter'}</strong> for{' '}
+                          <strong>{booking.serviceType}</strong> care
+                        </>
+                      )}
                       {booking.petType ? (
                         <span> ({petTypeLabel(booking.petType)})</span>
                       ) : null}

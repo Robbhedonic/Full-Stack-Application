@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
+import { bookingInclude, bookingScopeForUser, isOwnerRole } from '../lib/bookingAccess.js';
 import { serializeBooking } from '../lib/serializers.js';
 import { requireAuth } from '../middleware/auth.js';
 
@@ -9,9 +10,15 @@ const PET_TYPES = new Set(['dog', 'cat', 'bird', 'rabbit', 'reptile', 'other']);
 router.use(requireAuth);
 
 router.get('/', async (req, res) => {
-  const sitterId = req.query.sitterId?.toString();
+  const scope = await bookingScopeForUser(req.user);
+
+  if (!scope) {
+    return res.status(403).json({ error: 'Admins should use /api/admin/stats to view all bookings' });
+  }
+
   const bookings = await prisma.booking.findMany({
-    where: sitterId ? { sitterId } : undefined,
+    where: scope,
+    include: bookingInclude,
     orderBy: { createdAt: 'desc' },
   });
 
@@ -19,6 +26,10 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
+  if (!isOwnerRole(req.user.role)) {
+    return res.status(403).json({ error: 'Only owners can create bookings' });
+  }
+
   const { sitterId, ownerName, serviceType, petType, startDate, durationHours } = req.body;
 
   if (!sitterId || !ownerName || !serviceType || !startDate || !durationHours) {
@@ -54,6 +65,7 @@ router.post('/', async (req, res) => {
       durationHours: Number(durationHours),
       status: 'pending',
     },
+    include: bookingInclude,
   });
 
   return res.status(201).json({ booking: serializeBooking(booking) });

@@ -14,6 +14,7 @@ export function serializeBooking(booking) {
   return {
     id: booking.id,
     sitterId: booking.sitterId,
+    sitterName: booking.sitter?.name ?? null,
     ownerName: booking.ownerName,
     serviceType: booking.serviceType,
     petType: booking.petType,
