@@ -111,6 +111,13 @@ Migrations and seed run automatically when the backend container starts.
 | GET | `/api/bookings` | Yes |
 | POST | `/api/bookings` | Yes |
 
+## CI
+
+| Workflow | Trigger | What it runs |
+|----------|---------|--------------|
+| `deploy.yml` | Push to `main`, pull requests | PostgreSQL service, Prisma migrate + seed, backend lint + **6 tests**, frontend lint + build |
+| `ci.yml` | Pull requests only | Fast lint (backend + frontend) without database |
+
 ## Tests
 
 Requires PostgreSQL with migrations and seed applied:

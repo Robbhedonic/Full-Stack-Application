@@ -1,16 +1,35 @@
-name: CI
+name: Deploy CI
 
-# Quick lint on PRs; full tests run in deploy.yml
 on:
+  push:
+    branches:
+      - main
   pull_request:
 
 jobs:
-  backend:
-    name: Backend lint
+  test-backend:
+    name: Backend lint and tests
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: petcare
+          POSTGRES_PASSWORD: petcare
+          POSTGRES_DB: petcare
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U petcare -d petcare"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://petcare:petcare@localhost:5432/petcare
+      FRONTEND_URL: http://localhost:5173
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,7 +47,16 @@ jobs:
       - name: Run lint
         run: npm run lint
 
-  frontend:
+      - name: Apply migrations
+        run: npm run db:migrate:deploy
+
+      - name: Seed database
+        run: npm run db:seed
+
+      - name: Run tests
+        run: npm test
+
+  test-frontend:
     name: Frontend lint and build
     runs-on: ubuntu-latest
     defaults:
