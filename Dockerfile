@@ -1,6 +1,8 @@
 FROM node:22-alpine AS frontend-build
 WORKDIR /app/frontend
 
+RUN apk upgrade --no-cache
+
 COPY frontend/package*.json ./
 RUN npm ci
 
@@ -11,7 +13,7 @@ RUN npm run build
 FROM node:22-alpine AS backend-runtime
 WORKDIR /app/backend
 
-RUN apk add --no-cache openssl
+RUN apk upgrade --no-cache && apk add --no-cache openssl
 
 COPY backend/package*.json ./
 COPY backend/prisma ./prisma/

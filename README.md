@@ -223,7 +223,53 @@ After deploy, run **Actions → Post-Deploy Check → Run workflow** and paste y
 
 ## Deployed URLs
 
-_Add after deployment:_
+- **App (frontend + API):** https://full-stack-application-production-665e.up.railway.app
+- **Health check:** https://full-stack-application-production-665e.up.railway.app/api/health
+- **Home:** https://full-stack-application-production-665e.up.railway.app/home
+- **Admin:** https://full-stack-application-production-665e.up.railway.app/admin
 
-- App (frontend + API): https://YOUR-APP.up.railway.app
-- Health: https://YOUR-APP.up.railway.app/api/health
+Deployed on **Railway** (monolith: React build served by Express + PostgreSQL plugin).
+
+## Reflection questions
+
+### 1. Why did you choose this deployment platform? What were the alternatives you considered?
+
+We chose **Railway** because the project already had a root `Dockerfile` and `railway.toml`, and a single public URL simplifies cookies, CORS, and the demo. Alternatives considered were **Render + Vercel** (split frontend/backend), **Azure App Service** (better for enterprise portfolios), and **Fly.io**. Railway was the fastest path to a working production deploy with built-in PostgreSQL.
+
+### 2. What challenges did you face with Docker? How did you solve them?
+
+Main challenges: (1) the app needed PostgreSQL before Prisma migrations could run — fixed by adding a Postgres service and linking `DATABASE_URL`; (2) healthcheck failures when the public port did not match the app port — fixed by setting Railway target port to **8080**; (3) nginx base image vulnerability warnings in local docker-compose — replaced nginx with a small **Node + Express** static server in `frontend/Dockerfile`. We also run `apk upgrade` in Alpine stages to patch OS packages.
+
+### 3. How did you handle environment variables and secrets in production vs locally?
+
+Locally, secrets live in `backend/.env` (from `.env.example`) and are gitignored. In production, Railway injects `DATABASE_URL`, `PORT`, and `RAILWAY_PUBLIC_DOMAIN`; we set `NODE_ENV=production` and `FRONTEND_URL=https://${{RAILWAY_PUBLIC_DOMAIN}}`. No secrets are baked into Docker images or committed to GitHub.
+
+### 4. What would you do differently if you had one more week?
+
+Add persistent session storage (Redis or DB) instead of in-memory sessions, split frontend and backend into separate Railway/Vercel services with stricter CI smoke tests after every deploy, add E2E tests (Playwright), and automate the post-deploy GitHub Action on every release.
+
+### 5. How did you ensure that authentication still works after deployment?
+
+Auth uses **httpOnly cookies** (`petcare_session`) with `credentials: 'include'` on all API calls. CORS allows only `FRONTEND_URL`. On Railway, frontend and API share the same origin (monolith), so cookies work without cross-site complexity. Login, logout, protected bookings, and admin routes were tested on the live URL.
+
+## Security checklist (production)
+
+| # | Requirement | Status | How we verified |
+|---|-------------|--------|-----------------|
+| 1 | No secrets committed | ✅ | `.env` gitignored; Railway variables for `DATABASE_URL` |
+| 2 | CORS restricted to frontend URL | ✅ | `FRONTEND_URL` in `backend/src/server.js` — not `*` |
+| 3 | No tokens in localStorage | ✅ | Session cookie only via `petcare_session` |
+| 4 | `credentials: 'include'` on auth requests | ✅ | `frontend/src/api.js` |
+| 5 | Docker image has no `.env` or host `node_modules` | ✅ | `.dockerignore` excludes both |
+| 6 | HTTPS on deployed backend | ✅ | Railway provides HTTPS on `*.up.railway.app` |
+| 7 | Auth uses deployed URL, not localhost | ✅ | `FRONTEND_URL` set to Railway public domain |
+
+## Demo accounts (production seed)
+
+All passwords: `password123`
+
+| Role | Email |
+|------|-------|
+| Admin | `admin@petcare.test` |
+| Pet owner | `jane@petcare.test` |
+| Caregiver | `luna@petcare.test` |
