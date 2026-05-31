@@ -184,7 +184,7 @@ Open the app:
 - Home: `https://YOUR-APP.up.railway.app/home`
 - Admin: `https://YOUR-APP.up.railway.app/admin` (`admin@petcare.test` / `password123`)
 
-Migrations and seed run in Railway's **pre-deploy** step (`railway.toml`), then the server starts with `npm start`.
+Migrations and seed run when the container starts (`railway.toml` `startCommand`).
 
 ### Troubleshooting
 
@@ -211,11 +211,11 @@ The public **target port** must match the port in deploy logs (`API listening on
 3. **Redeploy**
 
 **Check deploy logs for:**
-- ✅ `All migrations have been successfully applied`
-- ✅ `Seed complete`
-- ✅ `API listening on 0.0.0.0:...`
-- ❌ `P1012` → `DATABASE_URL` not linked
-- ❌ `Can't reach database server` → Postgres not running or not linked
+- OK: `All migrations have been successfully applied`
+- OK: `Seed complete`
+- OK: `API listening on 0.0.0.0:...`
+- Error: `P1012` - `DATABASE_URL` not linked
+- Error: `Can't reach database server` - Postgres not running or not linked
 
 ### 6. GitHub Actions smoke test (optional)
 
@@ -256,13 +256,13 @@ Auth uses **httpOnly cookies** (`petcare_session`) with `credentials: 'include'`
 
 | # | Requirement | Status | How we verified |
 |---|-------------|--------|-----------------|
-| 1 | No secrets committed | ✅ | `.env` gitignored; Railway variables for `DATABASE_URL` |
-| 2 | CORS restricted to frontend URL | ✅ | `FRONTEND_URL` in `backend/src/server.js` — not `*` |
-| 3 | No tokens in localStorage | ✅ | Session cookie only via `petcare_session` |
-| 4 | `credentials: 'include'` on auth requests | ✅ | `frontend/src/api.js` |
-| 5 | Docker image has no `.env` or host `node_modules` | ✅ | `.dockerignore` excludes both |
-| 6 | HTTPS on deployed backend | ✅ | Railway provides HTTPS on `*.up.railway.app` |
-| 7 | Auth uses deployed URL, not localhost | ✅ | `FRONTEND_URL` set to Railway public domain |
+| 1 | No secrets committed | Yes | `.env` gitignored; Railway variables for `DATABASE_URL` |
+| 2 | CORS restricted to frontend URL | Yes | `FRONTEND_URL` in `backend/src/server.js` — not `*` |
+| 3 | No tokens in localStorage | Yes | Session cookie only via `petcare_session` |
+| 4 | `credentials: 'include'` on auth requests | Yes | `frontend/src/api.js` |
+| 5 | Docker image has no `.env` or host `node_modules` | Yes | `.dockerignore` excludes both |
+| 6 | HTTPS on deployed backend | Yes | Railway provides HTTPS on `*.up.railway.app` |
+| 7 | Auth uses deployed URL, not localhost | Yes | `FRONTEND_URL` set to Railway public domain |
 
 ## Demo accounts (production seed)
 
