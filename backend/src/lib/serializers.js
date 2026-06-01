@@ -3,6 +3,13 @@ export function serializeSitter(sitter) {
     id: sitter.id,
     name: sitter.name,
     type: sitter.type,
+    petTypes: sitter.petTypes
+      ? sitter.petTypes
+          .split(',')
+          .map((value) => value.trim())
+          .filter(Boolean)
+      : [],
+    availability: sitter.availability ?? null,
     rating: sitter.rating,
     pricePerHour: sitter.pricePerHour,
     description: sitter.description,

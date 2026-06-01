@@ -71,6 +71,12 @@ export default function App() {
   const [authPassword, setAuthPassword] = useState('');
   const [authMessage, setAuthMessage] = useState('');
   const [adminStats, setAdminStats] = useState(null);
+  const [mySitterProfile, setMySitterProfile] = useState(null);
+  const [caregiverCareType, setCaregiverCareType] = useState('pet');
+  const [caregiverPetTypes, setCaregiverPetTypes] = useState(['dog', 'cat']);
+  const [caregiverAvailability, setCaregiverAvailability] = useState('');
+  const [caregiverLocation, setCaregiverLocation] = useState('');
+  const [caregiverPricePerHour, setCaregiverPricePerHour] = useState('15');
 
   function roleLabel(role) {
     const labels = {
@@ -118,10 +124,28 @@ export default function App() {
     try {
       const { response, data } = await apiFetch(API.me);
       setAuthUser(response.ok ? data.user : null);
+      setMySitterProfile(response.ok ? data.sitterProfile ?? null : null);
     } catch {
       setAuthUser(null);
+      setMySitterProfile(null);
     }
   }, []);
+
+  function toggleCaregiverPetType(value) {
+    setCaregiverPetTypes((current) =>
+      current.includes(value) ? current.filter((item) => item !== value) : [...current, value]
+    );
+  }
+
+  function formatSitterPetTypes(petTypes) {
+    if (!petTypes?.length) return null;
+    return petTypes.map((value) => petTypeLabel(value)).join(', ');
+  }
+
+  function careTypeLabel(type) {
+    const labels = { pet: 'Pet care', plant: 'Plant care', both: 'Pet & plant care' };
+    return labels[type] ?? type;
+  }
 
   const loadSitters = useCallback(async () => {
     try {
@@ -194,7 +218,9 @@ export default function App() {
     }
   }, [authUser, currentPage, navigate, loadSitters, loadBookings, loadAdminStats]);
 
-  const filteredSitters = sitters.filter((sitter) => sitter.type === serviceType);
+  const filteredSitters = sitters.filter(
+    (sitter) => sitter.type === serviceType || sitter.type === 'both'
+  );
 
   useEffect(() => {
     if (filteredSitters.length === 0) {
@@ -282,10 +308,35 @@ export default function App() {
     setAuthMessage('');
 
     const path = authMode === 'login' ? API.login : API.register;
-    const body =
+    let body =
       authMode === 'login'
         ? { email: authEmail, password: authPassword }
         : { name: authName, email: authEmail, password: authPassword, role: userType };
+
+    if (authMode === 'register' && userType === 'caregiver') {
+      if (!caregiverAvailability.trim()) {
+        setAuthMessage('Please enter your availability / free time.');
+        return;
+      }
+      if (
+        (caregiverCareType === 'pet' || caregiverCareType === 'both') &&
+        caregiverPetTypes.length === 0
+      ) {
+        setAuthMessage('Select at least one animal type you can care for.');
+        return;
+      }
+
+      body = {
+        ...body,
+        caregiverProfile: {
+          careType: caregiverCareType,
+          petTypes: caregiverCareType === 'plant' ? [] : caregiverPetTypes,
+          availability: caregiverAvailability.trim(),
+          location: caregiverLocation.trim(),
+          pricePerHour: caregiverPricePerHour,
+        },
+      };
+    }
 
     try {
       const { response, data } = await apiFetch(path, {
@@ -299,6 +350,9 @@ export default function App() {
       }
 
       setAuthUser(data.user);
+      if (authMode === 'register') {
+        await loadSession();
+      }
       setAuthMessage(
         authMode === 'login'
           ? `Welcome back, ${data.user.name}!`
@@ -307,6 +361,11 @@ export default function App() {
       setAuthName('');
       setAuthEmail('');
       setAuthPassword('');
+      setCaregiverAvailability('');
+      setCaregiverLocation('');
+      setCaregiverPricePerHour('15');
+      setCaregiverCareType('pet');
+      setCaregiverPetTypes(['dog', 'cat']);
       navigate(data.user.role === 'admin' ? 'admin' : 'dashboard');
     } catch {
       setAuthMessage('Could not connect to the server.');
@@ -320,6 +379,7 @@ export default function App() {
       // ignore
     }
     setAuthUser(null);
+    setMySitterProfile(null);
     setAdminStats(null);
     setBookings([]);
     setSitters([]);
@@ -477,6 +537,73 @@ export default function App() {
                   </div>
                 )}
 
+                {authMode === 'register' && userType === 'caregiver' && (
+                  <fieldset className="caregiver-register-fields">
+                    <legend>Your caregiver profile</legend>
+
+                    <label>
+                      Care you provide
+                      <select
+                        value={caregiverCareType}
+                        onChange={(e) => setCaregiverCareType(e.target.value)}
+                      >
+                        <option value="pet">Pet care</option>
+                        <option value="plant">Plant care</option>
+                        <option value="both">Pet and plant care</option>
+                      </select>
+                    </label>
+
+                    {(caregiverCareType === 'pet' || caregiverCareType === 'both') && (
+                      <div className="pet-type-checkboxes">
+                        <span className="field-label">Animal types you care for</span>
+                        <div className="checkbox-row">
+                          {PET_TYPE_OPTIONS.map((option) => (
+                            <label key={option.value} className="checkbox-option">
+                              <input
+                                type="checkbox"
+                                checked={caregiverPetTypes.includes(option.value)}
+                                onChange={() => toggleCaregiverPetType(option.value)}
+                              />
+                              {option.label}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <label>
+                      Availability / free time
+                      <textarea
+                        value={caregiverAvailability}
+                        onChange={(e) => setCaregiverAvailability(e.target.value)}
+                        placeholder="e.g. Weekdays 5pm–9pm, Saturdays all day"
+                        rows={3}
+                        required
+                      />
+                    </label>
+
+                    <label>
+                      Service area
+                      <input
+                        value={caregiverLocation}
+                        onChange={(e) => setCaregiverLocation(e.target.value)}
+                        placeholder="e.g. Downtown, Northside"
+                      />
+                    </label>
+
+                    <label>
+                      Hourly rate (USD)
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={caregiverPricePerHour}
+                        onChange={(e) => setCaregiverPricePerHour(e.target.value)}
+                      />
+                    </label>
+                  </fieldset>
+                )}
+
                 <button type="submit" className="action-btn auth-action">
                   {authMode === 'login' ? 'Sign in' : 'Create account'}
                 </button>
@@ -624,6 +751,35 @@ export default function App() {
           </div>
 
           <div className="dashboard-stack">
+            {isCaregiverRole(authUser.role) && mySitterProfile && (
+              <section className="panel caregiver-profile-panel">
+                <h3>Your public sitter listing</h3>
+                <p className="hero-note">Owners see this profile when booking care.</p>
+                <ul className="caregiver-profile-details">
+                  <li>
+                    <strong>Services:</strong> {careTypeLabel(mySitterProfile.type)}
+                  </li>
+                  {mySitterProfile.petTypes?.length > 0 && (
+                    <li>
+                      <strong>Animals:</strong> {formatSitterPetTypes(mySitterProfile.petTypes)}
+                    </li>
+                  )}
+                  {mySitterProfile.availability && (
+                    <li>
+                      <strong>Availability:</strong> {mySitterProfile.availability}
+                    </li>
+                  )}
+                  <li>
+                    <strong>Area:</strong> {mySitterProfile.location}
+                  </li>
+                  <li>
+                    <strong>Rate:</strong> ${mySitterProfile.pricePerHour}/hr
+                  </li>
+                </ul>
+                <p>{mySitterProfile.description}</p>
+              </section>
+            )}
+
             <section className="panel bookings-panel">
               <h3>{isCaregiverRole(authUser.role) ? 'Clients who booked you' : 'Your reservations'}</h3>
               {bookings.length === 0 ? (
@@ -676,7 +832,11 @@ export default function App() {
                           <h4>{sitter.name}</h4>
                           <p>{sitter.description}</p>
                           <div className="sitter-meta">
-                            <span>{sitter.type} care</span>
+                            <span>{careTypeLabel(sitter.type)}</span>
+                            {formatSitterPetTypes(sitter.petTypes) && (
+                              <span>Animals: {formatSitterPetTypes(sitter.petTypes)}</span>
+                            )}
+                            {sitter.availability && <span>Free time: {sitter.availability}</span>}
                             <span>{sitter.location}</span>
                             <span>${sitter.pricePerHour}/hr</span>
                           </div>

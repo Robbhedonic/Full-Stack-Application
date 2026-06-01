@@ -2,7 +2,8 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { UserRole } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
-import { parseClientRole, serializeUser } from '../lib/serializers.js';
+import { parseCaregiverProfile, validateCaregiverProfile } from '../lib/caregiverProfile.js';
+import { parseClientRole, serializeSitter, serializeUser } from '../lib/serializers.js';
 import { createSession, deleteSession, getSessionUserId } from '../lib/sessions.js';
 import { SESSION_COOKIE, requireAuth } from '../middleware/auth.js';
 
@@ -25,7 +26,7 @@ function attachSession(res, userId) {
 }
 
 router.post('/register', async (req, res) => {
-  const { name, email, password, role } = req.body;
+  const { name, email, password, role, caregiverProfile } = req.body;
 
   if (!name || !email || !password || !role) {
     return res.status(400).json({ error: 'Missing registration fields' });
@@ -47,6 +48,30 @@ router.post('/register', async (req, res) => {
   const existing = await prisma.user.findUnique({ where: { email: email.trim().toLowerCase() } });
   if (existing) {
     return res.status(409).json({ error: 'Email already registered' });
+  }
+
+  if (prismaRole === UserRole.CAREGIVER) {
+    const profileError = validateCaregiverProfile(caregiverProfile);
+    if (profileError) {
+      return res.status(400).json({ error: profileError });
+    }
+
+    const sitterData = parseCaregiverProfile(caregiverProfile, name);
+
+    const user = await prisma.user.create({
+      data: {
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        passwordHash: await bcrypt.hash(password, 10),
+        role: prismaRole,
+        sitterProfile: {
+          create: sitterData,
+        },
+      },
+    });
+
+    attachSession(res, user.id);
+    return res.status(201).json({ user: serializeUser(user) });
   }
 
   const user = await prisma.user.create({
@@ -95,12 +120,18 @@ router.get('/me', async (req, res) => {
     return res.status(401).json({ error: 'Not authenticated' });
   }
 
-  const user = await prisma.user.findUnique({ where: { id: userId } });
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { sitterProfile: true },
+  });
   if (!user) {
     return res.status(401).json({ error: 'Invalid session' });
   }
 
-  return res.json({ user: serializeUser(user) });
+  return res.json({
+    user: serializeUser(user),
+    sitterProfile: user.sitterProfile ? serializeSitter(user.sitterProfile) : null,
+  });
 });
 
 router.get('/protected', requireAuth, (req, res) => {

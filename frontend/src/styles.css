@@ -642,7 +642,8 @@ dd {
 .auth-form input,
 .booking-form input,
 .booking-form select,
-.auth-form select {
+.auth-form select,
+.auth-form textarea {
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -651,6 +652,74 @@ dd {
   padding: 0.85rem 1rem;
   background: rgba(255, 255, 255, 0.96);
   font: inherit;
+  color: var(--text-main);
+}
+
+.auth-form textarea {
+  resize: vertical;
+  min-height: 5rem;
+}
+
+.caregiver-register-fields {
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid rgba(45, 106, 79, 0.2);
+  border-radius: 16px;
+  background: rgba(216, 243, 220, 0.25);
+  display: grid;
+  gap: 1rem;
+}
+
+.caregiver-register-fields legend {
+  padding: 0 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #2d6a4f;
+}
+
+.pet-type-checkboxes {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.field-label {
+  font-size: 0.95rem;
+  color: var(--text-main);
+}
+
+.checkbox-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.checkbox-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 45, 58, 0.12);
+  background: rgba(255, 255, 255, 0.88);
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.checkbox-option input {
+  width: auto;
+  accent-color: #2d6a4f;
+}
+
+.caregiver-profile-details {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+  color: var(--text-muted);
+}
+
+.caregiver-profile-details strong {
   color: var(--text-main);
 }
 
