@@ -13,7 +13,7 @@ const ABOUT_GALLERY = [
   {
     src: hamsterImage,
     alt: 'Small pet receiving gentle care',
-    caption: 'Every pet matters',
+    caption: 'Every member of the family is important',
   },
   {
     src: plantsCareImage,
