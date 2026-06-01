@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types';
 import careSitterImage from '../images/care-sitter-with-dog.jpg';
 import hamsterImage from '../images/hamster.jpg';
 import plantsCareImage from '../images/planst-care.webp';
@@ -77,3 +78,7 @@ export default function AboutPage({ onBackHome }) {
     </article>
   );
 }
+
+AboutPage.propTypes = {
+  onBackHome: PropTypes.func.isRequired,
+};
