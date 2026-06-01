@@ -98,19 +98,50 @@ const users = [
   ...caregivers.map((u) => ({ ...u, role: UserRole.CAREGIVER })),
 ];
 
+function ownerCareDefaults(user) {
+  if (user.role === UserRole.OWNER_PET) {
+    return {
+      ownerPetType: 'dog',
+      ownerMealsPerDay: 2,
+      ownerCareNotes: 'Dry food in the kitchen cupboard. Evening walk preferred.',
+    };
+  }
+  if (user.role === UserRole.OWNER_PLANT) {
+    return {
+      ownerPlantType: 'succulent',
+      ownerWateringSchedule: 'Every 7 days, mornings',
+      ownerWateringAmount: 'Light soak until drainage; do not leave standing water',
+    };
+  }
+  if (user.role === UserRole.OWNER_MIXED) {
+    return {
+      ownerPetType: 'cat',
+      ownerMealsPerDay: 2,
+      ownerPlantType: 'tropical',
+      ownerWateringSchedule: 'Twice a week (Mon & Thu)',
+      ownerWateringAmount: 'About 250 ml per large pot',
+      ownerCareNotes: 'Cat is shy with strangers; plants on the balcony.',
+    };
+  }
+  return {};
+}
+
 async function upsertUser(user, passwordHash) {
+  const ownerCare = ownerCareDefaults(user);
   const record = await prisma.user.upsert({
     where: { email: user.email },
     update: {
       name: user.name,
       role: user.role,
       passwordHash,
+      ...ownerCare,
     },
     create: {
       email: user.email,
       name: user.name,
       role: user.role,
       passwordHash,
+      ...ownerCare,
     },
   });
 
@@ -152,14 +183,76 @@ async function seedBookings() {
   if (owners.length === 0 || sitters.length === 0) return;
 
   const samples = [
-    { serviceType: 'pet', petType: 'dog', status: 'pending', daysAhead: 2, hours: 3 },
-    { serviceType: 'pet', petType: 'cat', status: 'confirmed', daysAhead: 5, hours: 4 },
-    { serviceType: 'plant', petType: null, status: 'pending', daysAhead: 3, hours: 2 },
-    { serviceType: 'plant', petType: null, status: 'completed', daysAhead: -2, hours: 2 },
-    { serviceType: 'pet', petType: 'dog', status: 'pending', daysAhead: 7, hours: 5 },
-    { serviceType: 'plant', petType: null, status: 'confirmed', daysAhead: 4, hours: 3 },
-    { serviceType: 'pet', petType: 'cat', status: 'pending', daysAhead: 1, hours: 2 },
-    { serviceType: 'plant', petType: null, status: 'pending', daysAhead: 6, hours: 4 },
+    {
+      serviceType: 'pet',
+      petType: 'dog',
+      mealsPerDay: 2,
+      careNotes: 'Morning and evening dry food',
+      status: 'pending',
+      daysAhead: 2,
+      hours: 3,
+    },
+    {
+      serviceType: 'pet',
+      petType: 'cat',
+      mealsPerDay: 3,
+      careNotes: 'Wet food at lunch',
+      status: 'confirmed',
+      daysAhead: 5,
+      hours: 4,
+    },
+    {
+      serviceType: 'plant',
+      plantType: 'succulent',
+      wateringSchedule: 'Every 10 days',
+      wateringAmount: '50 ml per small pot',
+      status: 'pending',
+      daysAhead: 3,
+      hours: 2,
+    },
+    {
+      serviceType: 'plant',
+      plantType: 'tropical',
+      wateringSchedule: 'Twice weekly',
+      wateringAmount: 'Until soil is moist',
+      status: 'completed',
+      daysAhead: -2,
+      hours: 2,
+    },
+    {
+      serviceType: 'pet',
+      petType: 'dog',
+      mealsPerDay: 2,
+      status: 'pending',
+      daysAhead: 7,
+      hours: 5,
+    },
+    {
+      serviceType: 'plant',
+      plantType: 'herbs',
+      wateringSchedule: 'Daily in summer',
+      wateringAmount: '100 ml',
+      status: 'confirmed',
+      daysAhead: 4,
+      hours: 3,
+    },
+    {
+      serviceType: 'pet',
+      petType: 'cat',
+      mealsPerDay: 2,
+      status: 'pending',
+      daysAhead: 1,
+      hours: 2,
+    },
+    {
+      serviceType: 'plant',
+      plantType: 'fern',
+      wateringSchedule: 'Every 3 days',
+      wateringAmount: 'Mist leaves and water base lightly',
+      status: 'pending',
+      daysAhead: 6,
+      hours: 4,
+    },
   ];
 
   for (let i = 0; i < samples.length; i += 1) {
@@ -183,7 +276,12 @@ async function seedBookings() {
         sitterId: sitter.id,
         ownerName: owner.name,
         serviceType: sample.serviceType,
-        petType: sample.petType,
+        petType: sample.petType ?? null,
+        plantType: sample.plantType ?? null,
+        mealsPerDay: sample.mealsPerDay ?? null,
+        wateringSchedule: sample.wateringSchedule ?? null,
+        wateringAmount: sample.wateringAmount ?? null,
+        careNotes: sample.careNotes ?? null,
         startDate: new Date(Date.now() + sample.daysAhead * 24 * 60 * 60 * 1000),
         durationHours: sample.hours,
         status: sample.status,

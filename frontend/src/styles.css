@@ -965,6 +965,44 @@ dd {
   font-size: 0.95rem;
 }
 
+.booking-care-detail {
+  margin: 0.35rem 0 0;
+  font-size: 0.9rem;
+  color: var(--text-muted, #5a6b5f);
+  line-height: 1.4;
+}
+
+.owner-care-fieldset {
+  border: 1px solid rgba(45, 90, 61, 0.15);
+  border-radius: 12px;
+  padding: 1rem 1.1rem 1.2rem;
+  margin: 0 0 1rem;
+}
+
+.owner-care-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px dashed rgba(45, 90, 61, 0.12);
+}
+
+.owner-care-block:last-of-type {
+  border-bottom: none;
+  margin-bottom: 0.5rem;
+}
+
+.owner-care-heading {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--green-deep, #2d5a3d);
+}
+
+.owner-care-summary {
+  margin-top: 0.75rem;
+}
+
 .booking-item-main {
   line-height: 1.5;
 }

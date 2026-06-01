@@ -16,15 +16,21 @@ enum UserRole {
 }
 
 model User {
-  id            String         @id @default(cuid())
-  email         String         @unique
-  passwordHash  String
-  name          String
-  role          UserRole
-  profileMode   String?
-  createdAt     DateTime       @default(now())
-  sitterProfile SitterProfile?
-  bookings      Booking[]      @relation("OwnerBookings")
+  id                    String         @id @default(cuid())
+  email                 String         @unique
+  passwordHash          String
+  name                  String
+  role                  UserRole
+  profileMode           String?
+  ownerPetType          String?
+  ownerPlantType        String?
+  ownerMealsPerDay      Int?
+  ownerWateringSchedule String?
+  ownerWateringAmount   String?
+  ownerCareNotes        String?
+  createdAt             DateTime       @default(now())
+  sitterProfile         SitterProfile?
+  bookings              Booking[]      @relation("OwnerBookings")
 }
 
 model SitterProfile {
@@ -43,16 +49,21 @@ model SitterProfile {
 }
 
 model Booking {
-  id            String        @id @default(cuid())
-  sitterId      String
-  sitter        SitterProfile @relation(fields: [sitterId], references: [id])
-  ownerId       String?
-  owner         User?         @relation("OwnerBookings", fields: [ownerId], references: [id], onDelete: SetNull)
-  ownerName     String
-  serviceType   String
-  petType       String?
-  startDate     DateTime
-  durationHours Int
-  status        String        @default("pending")
-  createdAt     DateTime      @default(now())
+  id               String        @id @default(cuid())
+  sitterId         String
+  sitter           SitterProfile @relation(fields: [sitterId], references: [id])
+  ownerId          String?
+  owner            User?         @relation("OwnerBookings", fields: [ownerId], references: [id], onDelete: SetNull)
+  ownerName        String
+  serviceType      String
+  petType          String?
+  plantType        String?
+  mealsPerDay      Int?
+  wateringSchedule String?
+  wateringAmount   String?
+  careNotes        String?
+  startDate        DateTime
+  durationHours    Int
+  status           String        @default("pending")
+  createdAt        DateTime      @default(now())
 }

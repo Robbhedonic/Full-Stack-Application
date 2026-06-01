@@ -43,6 +43,8 @@ test('POST /api/bookings creates a booking when authenticated', async () => {
         ownerName: 'Test Owner',
         serviceType: 'pet',
         petType: 'dog',
+        mealsPerDay: 2,
+        careNotes: 'Dry food twice daily',
         startDate: new Date().toISOString(),
         durationHours: 3,
       }),
@@ -53,6 +55,7 @@ test('POST /api/bookings creates a booking when authenticated', async () => {
     assert.equal(data.booking.sitterId, sitterId);
     assert.equal(data.booking.ownerName, 'Test Owner');
     assert.equal(data.booking.petType, 'dog');
+    assert.equal(data.booking.mealsPerDay, 2);
   } finally {
     await stopServer(server);
   }
@@ -80,6 +83,7 @@ test('GET /api/bookings returns only the signed-in owner bookings', async () => 
         ownerName: 'Jane Doe',
         serviceType: 'pet',
         petType: 'cat',
+        mealsPerDay: 2,
         startDate: new Date().toISOString(),
         durationHours: 2,
       }),
@@ -127,6 +131,7 @@ test('GET /api/bookings lets caregivers see reservations for their sitter profil
         ownerName: 'Jane Doe',
         serviceType: 'pet',
         petType: 'dog',
+        mealsPerDay: 2,
         startDate: new Date().toISOString(),
         durationHours: 4,
       }),
@@ -165,6 +170,7 @@ test('POST /api/bookings rejects caregivers creating bookings', async () => {
         ownerName: 'Luna',
         serviceType: 'pet',
         petType: 'dog',
+        mealsPerDay: 2,
         startDate: new Date().toISOString(),
         durationHours: 2,
       }),

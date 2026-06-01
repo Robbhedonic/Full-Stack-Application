@@ -13,6 +13,12 @@ import {
   parseCaregiverProfile,
   validateCaregiverProfile,
 } from '../lib/caregiverProfile.js';
+import {
+  extractOwnerCarePayload,
+  parseOwnerCareProfile,
+  serializeOwnerCareFromUser,
+  validateOwnerCareProfile,
+} from '../lib/careDetails.js';
 import { parseClientRole, serializeSitter, serializeUser } from '../lib/serializers.js';
 import { createSession, deleteSession, getSessionUserId } from '../lib/sessions.js';
 import { SESSION_COOKIE, requireAuth } from '../middleware/auth.js';
@@ -39,6 +45,7 @@ function buildAuthResponse(user, sitterProfile) {
   return {
     user: serializeUser(user),
     sitterProfile: sitterProfile ? serializeSitter(sitterProfile) : null,
+    ownerCare: serializeOwnerCareFromUser(user),
     accountMode: deriveAccountMode(user, sitterProfile),
   };
 }
@@ -157,6 +164,32 @@ router.post('/caregiver-profile', requireAuth, (req, res) =>
 router.put('/caregiver-profile', requireAuth, (req, res) =>
   saveCaregiverProfile(req, res, { create: false })
 );
+
+router.put('/owner-care', requireAuth, async (req, res) => {
+  if (req.user.role === UserRole.ADMIN) {
+    return res.status(403).json({ error: 'Admins cannot manage owner care details here' });
+  }
+
+  const payload = extractOwnerCarePayload(req.body);
+  const profileError = validateOwnerCareProfile(payload);
+  if (profileError) {
+    return res.status(400).json({ error: profileError });
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: { id: req.user.id },
+    data: parseOwnerCareProfile(payload),
+  });
+
+  const sitterProfile = await prisma.sitterProfile.findUnique({
+    where: { userId: req.user.id },
+  });
+
+  return res.json({
+    ...buildAuthResponse(updatedUser, sitterProfile),
+    message: 'Owner care details saved',
+  });
+});
 
 router.put('/account-mode', requireAuth, async (req, res) => {
   if (req.user.role === UserRole.ADMIN) {

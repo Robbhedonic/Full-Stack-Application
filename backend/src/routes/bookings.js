@@ -2,11 +2,11 @@ import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { canCreateBookings } from '../lib/bookingAccess.js';
 import { listBookingsForUser } from '../lib/bookingQueries.js';
+import { extractBookingCarePayload, validateBookingCareDetails } from '../lib/careDetails.js';
 import { serializeBooking } from '../lib/serializers.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
-const PET_TYPES = new Set(['dog', 'cat', 'bird', 'rabbit', 'reptile', 'other']);
 
 router.use(requireAuth);
 
@@ -25,7 +25,7 @@ router.post('/', async (req, res) => {
     return res.status(403).json({ error: 'Only owners can create bookings' });
   }
 
-  const { sitterId, ownerName, serviceType, petType, startDate, durationHours } = req.body;
+  const { sitterId, ownerName, serviceType, startDate, durationHours } = req.body;
 
   if (!sitterId || !ownerName || !serviceType || !startDate || !durationHours) {
     return res.status(400).json({ error: 'Missing booking fields' });
@@ -36,12 +36,12 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: 'Invalid care type' });
   }
 
-  let normalizedPetType = null;
-  if (normalizedServiceType === 'pet') {
-    normalizedPetType = petType?.toString().toLowerCase().trim();
-    if (!normalizedPetType || !PET_TYPES.has(normalizedPetType)) {
-      return res.status(400).json({ error: 'Pet type is required for pet care bookings' });
-    }
+  const careResult = validateBookingCareDetails(
+    normalizedServiceType,
+    extractBookingCarePayload(req.body)
+  );
+  if (careResult.error) {
+    return res.status(400).json({ error: careResult.error });
   }
 
   const sitter = await prisma.sitterProfile.findUnique({ where: { id: sitterId } });
@@ -55,7 +55,7 @@ router.post('/', async (req, res) => {
       ownerId: req.user.id,
       ownerName: ownerName.trim(),
       serviceType: normalizedServiceType,
-      petType: normalizedPetType,
+      ...careResult.data,
       startDate: new Date(startDate),
       durationHours: Number(durationHours),
       status: 'pending',

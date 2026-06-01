@@ -1,15 +1,7 @@
 import { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import { API, apiFetch } from '../api.js';
-
-const PET_TYPE_OPTIONS = [
-  { value: 'dog', label: 'Dog' },
-  { value: 'cat', label: 'Cat' },
-  { value: 'bird', label: 'Bird' },
-  { value: 'rabbit', label: 'Rabbit' },
-  { value: 'reptile', label: 'Reptile' },
-  { value: 'other', label: 'Other' },
-];
+import { PET_TYPE_OPTIONS, PLANT_TYPE_OPTIONS, petTypeLabel, plantTypeLabel } from '../careOptions.js';
 
 const MODE_OPTIONS = [
   {
@@ -28,10 +20,6 @@ const MODE_OPTIONS = [
     hint: 'I book care and I also offer services',
   },
 ];
-
-function petTypeLabel(value) {
-  return PET_TYPE_OPTIONS.find((option) => option.value === value)?.label ?? value;
-}
 
 function careTypeLabel(type) {
   const labels = { pet: 'Pet care', plant: 'Plant care', both: 'Pet & plant care' };
@@ -66,10 +54,26 @@ function needsCaregiverDetails(mode) {
   return mode === 'caregiver' || mode === 'both';
 }
 
+function needsOwnerDetails(mode) {
+  return mode === 'owner' || mode === 'both';
+}
+
+function ownerCareToFormState(ownerCare) {
+  return {
+    petType: ownerCare?.petType ?? '',
+    plantType: ownerCare?.plantType ?? '',
+    mealsPerDay: ownerCare?.mealsPerDay != null ? String(ownerCare.mealsPerDay) : '',
+    wateringSchedule: ownerCare?.wateringSchedule ?? '',
+    wateringAmount: ownerCare?.wateringAmount ?? '',
+    careNotes: ownerCare?.careNotes ?? '',
+  };
+}
+
 export default function ProfilePage({
   authUser,
   accountMode,
   sitterProfile,
+  ownerCare,
   onProfileChange,
   onNavigate,
 }) {
@@ -81,12 +85,14 @@ export default function ProfilePage({
   const [message, setMessage] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [form, setForm] = useState(() => profileToFormState(sitterProfile));
+  const [ownerForm, setOwnerForm] = useState(() => ownerCareToFormState(ownerCare));
 
   useEffect(() => {
     setMode(accountMode || 'owner');
     setForm(profileToFormState(sitterProfile));
+    setOwnerForm(ownerCareToFormState(ownerCare));
     setEditingCaregiver(needsCaregiverDetails(accountMode) && !sitterProfile);
-  }, [accountMode, sitterProfile]);
+  }, [accountMode, sitterProfile, ownerCare]);
 
   function togglePetType(value) {
     setForm((current) => ({
@@ -115,6 +121,60 @@ export default function ProfilePage({
         availability: availabilityText,
         location: form.location.trim(),
         pricePerHour: form.pricePerHour,
+      },
+    };
+  }
+
+  function validateOwnerForm() {
+    const hasPet = Boolean(ownerForm.petType || ownerForm.mealsPerDay);
+    const hasPlant = Boolean(
+      ownerForm.plantType || ownerForm.wateringSchedule || ownerForm.wateringAmount
+    );
+
+    if (!hasPet && !hasPlant) {
+      setMessage('Tell us about your pet, your plants, or both (type and care instructions).');
+      return false;
+    }
+
+    if (hasPet) {
+      if (!ownerForm.petType) {
+        setMessage('Select what type of pet you have.');
+        return false;
+      }
+      const meals = Number.parseInt(ownerForm.mealsPerDay, 10);
+      if (!Number.isFinite(meals) || meals < 1 || meals > 12) {
+        setMessage('Enter meals per day for your pet (1–12).');
+        return false;
+      }
+    }
+
+    if (hasPlant) {
+      if (!ownerForm.plantType) {
+        setMessage('Select what type of plants you have.');
+        return false;
+      }
+      if (!ownerForm.wateringSchedule.trim()) {
+        setMessage('Describe when to water your plants.');
+        return false;
+      }
+      if (!ownerForm.wateringAmount.trim()) {
+        setMessage('Describe how much water to use for your plants.');
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  function buildOwnerCarePayload() {
+    return {
+      ownerCare: {
+        petType: ownerForm.petType || null,
+        plantType: ownerForm.plantType || null,
+        mealsPerDay: ownerForm.mealsPerDay || null,
+        wateringSchedule: ownerForm.wateringSchedule.trim() || null,
+        wateringAmount: ownerForm.wateringAmount.trim() || null,
+        careNotes: ownerForm.careNotes.trim() || null,
       },
     };
   }
@@ -153,6 +213,22 @@ export default function ProfilePage({
       if (!modeResponse.response.ok) {
         setMessage(modeResponse.data?.error || 'Could not save account type');
         return;
+      }
+
+      if (needsOwnerDetails(mode)) {
+        if (!validateOwnerForm()) {
+          return;
+        }
+
+        const ownerResponse = await apiFetch(API.ownerCare, {
+          method: 'PUT',
+          body: JSON.stringify(buildOwnerCarePayload()),
+        });
+
+        if (!ownerResponse.response.ok) {
+          setMessage(ownerResponse.data?.error || 'Could not save your pet/plant details');
+          return;
+        }
       }
 
       if (needsCaregiverDetails(mode)) {
@@ -370,10 +446,112 @@ export default function ProfilePage({
           </>
         )}
 
-        {mode === 'owner' && (
-          <p className="hero-note">
-            As a pet owner you can book sitters from the dashboard. No caregiver listing is required.
-          </p>
+        {needsOwnerDetails(mode) && (
+          <fieldset className="owner-care-fieldset">
+            <legend>Your pets and plants</legend>
+            <p className="hero-note">
+              These details appear on your care requests so sitters know what you have and how to care for them.
+            </p>
+
+            <div className="owner-care-block">
+              <h3 className="owner-care-heading">Pet at home</h3>
+              <label>
+                Animal type
+                <select
+                  value={ownerForm.petType}
+                  onChange={(e) => setOwnerForm((current) => ({ ...current, petType: e.target.value }))}
+                >
+                  <option value="">No pet / skip</option>
+                  {PET_TYPE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {ownerForm.petType && (
+                <label>
+                  Meals per day
+                  <input
+                    type="number"
+                    min="1"
+                    max="12"
+                    value={ownerForm.mealsPerDay}
+                    onChange={(e) => setOwnerForm((current) => ({ ...current, mealsPerDay: e.target.value }))}
+                    placeholder="e.g. 2"
+                    required
+                  />
+                </label>
+              )}
+            </div>
+
+            <div className="owner-care-block">
+              <h3 className="owner-care-heading">Plants at home</h3>
+              <label>
+                Plant type
+                <select
+                  value={ownerForm.plantType}
+                  onChange={(e) => setOwnerForm((current) => ({ ...current, plantType: e.target.value }))}
+                >
+                  <option value="">No plants / skip</option>
+                  {PLANT_TYPE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {ownerForm.plantType && (
+                <>
+                  <label>
+                    When to water
+                    <input
+                      value={ownerForm.wateringSchedule}
+                      onChange={(e) =>
+                        setOwnerForm((current) => ({ ...current, wateringSchedule: e.target.value }))
+                      }
+                      placeholder="e.g. Every 3 days, Mon & Thu mornings"
+                      required
+                    />
+                  </label>
+                  <label>
+                    How much water
+                    <input
+                      value={ownerForm.wateringAmount}
+                      onChange={(e) =>
+                        setOwnerForm((current) => ({ ...current, wateringAmount: e.target.value }))
+                      }
+                      placeholder="e.g. 200 ml per pot until soil is moist"
+                      required
+                    />
+                  </label>
+                </>
+              )}
+            </div>
+
+            <label>
+              Extra care notes (optional)
+              <textarea
+                rows={3}
+                value={ownerForm.careNotes}
+                onChange={(e) => setOwnerForm((current) => ({ ...current, careNotes: e.target.value }))}
+                placeholder="Allergies, food brand, plant locations, etc."
+              />
+            </label>
+
+            {(ownerCare?.petType || ownerCare?.plantType) && (
+              <p className="hero-note owner-care-summary">
+                Saved:{' '}
+                {ownerCare.petType ? `${petTypeLabel(ownerCare.petType)}, ${ownerCare.mealsPerDay} meal(s)/day` : ''}
+                {ownerCare.petType && ownerCare.plantType ? ' · ' : ''}
+                {ownerCare.plantType
+                  ? `${plantTypeLabel(ownerCare.plantType)} — ${ownerCare.wateringSchedule}`
+                  : ''}
+              </p>
+            )}
+          </fieldset>
         )}
 
         <button type="submit" className="action-btn" disabled={isSaving}>
@@ -394,6 +572,7 @@ ProfilePage.propTypes = {
   }).isRequired,
   accountMode: PropTypes.string,
   sitterProfile: PropTypes.object,
+  ownerCare: PropTypes.object,
   onProfileChange: PropTypes.func.isRequired,
   onNavigate: PropTypes.func.isRequired,
 };

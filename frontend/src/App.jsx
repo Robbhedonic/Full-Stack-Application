@@ -7,19 +7,13 @@ import loginImage from './images/cat-black-being-loved.webp';
 import registerImage from './images/planst-care.webp';
 import homeImagePrimary from './images/Post-safe-houseplants-for-pets.jpg';
 import homeImageSecondary from './images/images.jpeg';
-
-const PET_TYPE_OPTIONS = [
-  { value: 'dog', label: 'Dog' },
-  { value: 'cat', label: 'Cat' },
-  { value: 'bird', label: 'Bird' },
-  { value: 'rabbit', label: 'Rabbit' },
-  { value: 'reptile', label: 'Reptile' },
-  { value: 'other', label: 'Other' },
-];
-
-function petTypeLabel(value) {
-  return PET_TYPE_OPTIONS.find((option) => option.value === value)?.label ?? value;
-}
+import {
+  PET_TYPE_OPTIONS,
+  PLANT_TYPE_OPTIONS,
+  formatBookingCareSummary,
+  petTypeLabel,
+  plantTypeLabel,
+} from './careOptions.js';
 
 function isOwnerRole(role) {
   return ['owner-pet', 'owner-plant', 'owner-mixed'].includes(role);
@@ -61,6 +55,12 @@ export default function App() {
   const [ownerName, setOwnerName] = useState('');
   const [serviceType, setServiceType] = useState('pet');
   const [petType, setPetType] = useState('dog');
+  const [plantType, setPlantType] = useState('succulent');
+  const [mealsPerDay, setMealsPerDay] = useState('2');
+  const [wateringSchedule, setWateringSchedule] = useState('');
+  const [wateringAmount, setWateringAmount] = useState('');
+  const [careNotes, setCareNotes] = useState('');
+  const [ownerCare, setOwnerCare] = useState(null);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [message, setMessage] = useState('');
@@ -70,7 +70,6 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState('home');
   const [authUser, setAuthUser] = useState(null);
   const [authMode, setAuthMode] = useState('register');
-  const [userType, setUserType] = useState('owner-pet');
   const [authName, setAuthName] = useState('');
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
@@ -125,18 +124,40 @@ export default function App() {
     return () => window.removeEventListener('popstate', syncFromUrl);
   }, []);
 
+  const applyOwnerCareDefaults = useCallback((care, nextServiceType = serviceType) => {
+    if (!care) return;
+    if (nextServiceType === 'pet' && care.petType) {
+      setPetType(care.petType);
+      if (care.mealsPerDay != null) setMealsPerDay(String(care.mealsPerDay));
+    }
+    if (nextServiceType === 'plant' && care.plantType) {
+      setPlantType(care.plantType);
+      if (care.wateringSchedule) setWateringSchedule(care.wateringSchedule);
+      if (care.wateringAmount) setWateringAmount(care.wateringAmount);
+    }
+    if (care.careNotes) setCareNotes(care.careNotes);
+  }, [serviceType]);
+
   const loadSession = useCallback(async () => {
     try {
       const { response, data } = await apiFetch(API.me);
       setAuthUser(response.ok ? data.user : null);
       setMySitterProfile(response.ok ? data.sitterProfile ?? null : null);
+      setOwnerCare(response.ok ? data.ownerCare ?? null : null);
       setAccountMode(response.ok ? data.accountMode ?? 'owner' : 'owner');
+      if (response.ok && data.ownerCare) {
+        applyOwnerCareDefaults(data.ownerCare);
+      }
+      if (response.ok && data.user?.name) {
+        setOwnerName((current) => current || data.user.name);
+      }
     } catch {
       setAuthUser(null);
       setMySitterProfile(null);
+      setOwnerCare(null);
       setAccountMode('owner');
     }
-  }, []);
+  }, [applyOwnerCareDefaults]);
 
   function formatSitterPetTypes(petTypes) {
     if (!petTypes?.length) return null;
@@ -242,6 +263,7 @@ export default function App() {
 
   function handleServiceTypeChange(nextType) {
     setServiceType(nextType);
+    applyOwnerCareDefaults(ownerCare, nextType);
   }
 
   async function handleSubmit(event) {
@@ -261,10 +283,36 @@ export default function App() {
       return;
     }
 
-    if (serviceType === 'pet' && !petType) {
-      setBookingMessage('Select a pet type for pet care bookings.');
-      setIsSubmittingBooking(false);
-      return;
+    if (serviceType === 'pet') {
+      if (!petType) {
+        setBookingMessage('Select a pet type for pet care bookings.');
+        setIsSubmittingBooking(false);
+        return;
+      }
+      const meals = Number.parseInt(mealsPerDay, 10);
+      if (!Number.isFinite(meals) || meals < 1 || meals > 12) {
+        setBookingMessage('Enter meals per day (1–12).');
+        setIsSubmittingBooking(false);
+        return;
+      }
+    }
+
+    if (serviceType === 'plant') {
+      if (!plantType) {
+        setBookingMessage('Select a plant type for plant care bookings.');
+        setIsSubmittingBooking(false);
+        return;
+      }
+      if (!wateringSchedule.trim()) {
+        setBookingMessage('Describe when to water the plants.');
+        setIsSubmittingBooking(false);
+        return;
+      }
+      if (!wateringAmount.trim()) {
+        setBookingMessage('Describe how much water to use.');
+        setIsSubmittingBooking(false);
+        return;
+      }
     }
 
     const durationHours = hoursBetween(startDate, endDate);
@@ -281,7 +329,14 @@ export default function App() {
           sitterId: selectedSitter,
           ownerName: ownerName.trim(),
           serviceType,
-          ...(serviceType === 'pet' ? { petType } : {}),
+          ...(serviceType === 'pet'
+            ? { petType, mealsPerDay: Number.parseInt(mealsPerDay, 10), careNotes: careNotes.trim() || undefined }
+            : {
+                plantType,
+                wateringSchedule: wateringSchedule.trim(),
+                wateringAmount: wateringAmount.trim(),
+                careNotes: careNotes.trim() || undefined,
+              }),
           startDate,
           durationHours,
         }),
@@ -322,7 +377,7 @@ export default function App() {
             name: authName,
             email: authEmail,
             password: authPassword,
-            role: userType,
+            role: 'owner-pet',
           }),
         });
 
@@ -474,6 +529,7 @@ export default function App() {
               authUser={authUser}
               accountMode={accountMode}
               sitterProfile={mySitterProfile}
+              ownerCare={ownerCare}
               onProfileChange={loadSession}
               onNavigate={navigate}
             />
@@ -761,7 +817,13 @@ export default function App() {
                         {booking.petType ? (
                           <span> ({petTypeLabel(booking.petType)})</span>
                         ) : null}
+                        {booking.plantType ? (
+                          <span> ({plantTypeLabel(booking.plantType)})</span>
+                        ) : null}
                       </div>
+                      {formatBookingCareSummary(booking) && (
+                        <p className="booking-care-detail">{formatBookingCareSummary(booking)}</p>
+                      )}
                       <div className="booking-meta">
                         <span>{formatBookingRange(booking.startDate, booking.durationHours)}</span>
                         <span>{booking.durationHours} hrs</span>
@@ -818,17 +880,73 @@ export default function App() {
                     </label>
 
                     {serviceType === 'pet' && (
-                      <label>
-                        Pet type
-                        <select value={petType} onChange={(e) => setPetType(e.target.value)} required>
-                          {PET_TYPE_OPTIONS.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
+                      <>
+                        <label>
+                          Pet type
+                          <select value={petType} onChange={(e) => setPetType(e.target.value)} required>
+                            {PET_TYPE_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label>
+                          Meals per day
+                          <input
+                            type="number"
+                            min="1"
+                            max="12"
+                            value={mealsPerDay}
+                            onChange={(e) => setMealsPerDay(e.target.value)}
+                            required
+                          />
+                        </label>
+                      </>
                     )}
+
+                    {serviceType === 'plant' && (
+                      <>
+                        <label>
+                          Plant type
+                          <select value={plantType} onChange={(e) => setPlantType(e.target.value)} required>
+                            {PLANT_TYPE_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label>
+                          When to water
+                          <input
+                            value={wateringSchedule}
+                            onChange={(e) => setWateringSchedule(e.target.value)}
+                            placeholder="e.g. Every 3 days, mornings only"
+                            required
+                          />
+                        </label>
+                        <label>
+                          How much water
+                          <input
+                            value={wateringAmount}
+                            onChange={(e) => setWateringAmount(e.target.value)}
+                            placeholder="e.g. 200 ml per pot"
+                            required
+                          />
+                        </label>
+                      </>
+                    )}
+
+                    <label>
+                      Extra care notes (optional)
+                      <textarea
+                        rows={2}
+                        value={careNotes}
+                        onChange={(e) => setCareNotes(e.target.value)}
+                        placeholder="Food brand, plant locations, special instructions"
+                      />
+                    </label>
 
                     <label>
                       Sitter

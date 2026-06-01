@@ -90,6 +90,7 @@ test('user can register, set both mode, and create caregiver listing', async () 
         ownerName: 'Both Mode User',
         serviceType: 'pet',
         petType: 'dog',
+        mealsPerDay: 2,
         startDate: new Date().toISOString(),
         durationHours: 2,
       }),
