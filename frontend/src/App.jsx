@@ -77,6 +77,8 @@ export default function App() {
   const [caregiverAvailability, setCaregiverAvailability] = useState('');
   const [caregiverLocation, setCaregiverLocation] = useState('');
   const [caregiverPricePerHour, setCaregiverPricePerHour] = useState('15');
+  const [registerSuccess, setRegisterSuccess] = useState(false);
+  const [loginCaregiverSetup, setLoginCaregiverSetup] = useState(false);
 
   function roleLabel(role) {
     const labels = {
@@ -95,6 +97,11 @@ export default function App() {
     setCurrentPage(page);
     if (page === 'login' || page === 'register') {
       setAuthMode(page);
+      if (page === 'login') {
+        setRegisterSuccess(false);
+      } else {
+        setLoginCaregiverSetup(false);
+      }
     }
   }, []);
 
@@ -303,45 +310,161 @@ export default function App() {
     }
   }
 
+  function buildCaregiverProfilePayload() {
+    return {
+      careType: caregiverCareType,
+      petTypes: caregiverCareType === 'plant' ? [] : caregiverPetTypes,
+      availability: caregiverAvailability.trim(),
+      location: caregiverLocation.trim(),
+      pricePerHour: caregiverPricePerHour,
+    };
+  }
+
+  function validateCaregiverProfileForm() {
+    if (!caregiverAvailability.trim()) {
+      setAuthMessage('Enter your hourly availability / free time.');
+      return false;
+    }
+    if (
+      (caregiverCareType === 'pet' || caregiverCareType === 'both') &&
+      caregiverPetTypes.length === 0
+    ) {
+      setAuthMessage('Select at least one animal type you care for.');
+      return false;
+    }
+    return true;
+  }
+
+  function renderCaregiverProfileFields() {
+    return (
+      <fieldset className="caregiver-register-fields">
+        <legend>What you offer as a caregiver</legend>
+
+        <label>
+          Care you provide
+          <select value={caregiverCareType} onChange={(e) => setCaregiverCareType(e.target.value)}>
+            <option value="pet">Pet care</option>
+            <option value="plant">Plant care</option>
+            <option value="both">Pet and plant care</option>
+          </select>
+        </label>
+
+        {(caregiverCareType === 'pet' || caregiverCareType === 'both') && (
+          <div className="pet-type-checkboxes">
+            <span className="field-label">What you care for (checkboxes)</span>
+            <div className="checkbox-row">
+              {PET_TYPE_OPTIONS.map((option) => (
+                <label key={option.value} className="checkbox-option">
+                  <input
+                    type="checkbox"
+                    checked={caregiverPetTypes.includes(option.value)}
+                    onChange={() => toggleCaregiverPetType(option.value)}
+                  />
+                  {option.label}
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <label>
+          Hourly availability / free time
+          <textarea
+            value={caregiverAvailability}
+            onChange={(e) => setCaregiverAvailability(e.target.value)}
+            placeholder="e.g. Mon–Fri 5pm–9pm, Sat 10am–6pm"
+            rows={3}
+            required
+          />
+        </label>
+
+        <label>
+          Service area
+          <input
+            value={caregiverLocation}
+            onChange={(e) => setCaregiverLocation(e.target.value)}
+            placeholder="e.g. Downtown, Northside"
+          />
+        </label>
+
+        <label>
+          Hourly rate (USD)
+          <input
+            type="number"
+            min="0"
+            step="1"
+            value={caregiverPricePerHour}
+            onChange={(e) => setCaregiverPricePerHour(e.target.value)}
+          />
+        </label>
+      </fieldset>
+    );
+  }
+
+  async function handleCaregiverProfileSubmit(event) {
+    event.preventDefault();
+    setAuthMessage('');
+
+    if (!validateCaregiverProfileForm()) {
+      return;
+    }
+
+    try {
+      const { response, data } = await apiFetch(API.caregiverProfile, {
+        method: 'POST',
+        body: JSON.stringify({ caregiverProfile: buildCaregiverProfilePayload() }),
+      });
+
+      if (!response.ok) {
+        setAuthMessage(data?.error || 'Could not save caregiver profile');
+        return;
+      }
+
+      setMySitterProfile(data.sitterProfile);
+      setLoginCaregiverSetup(false);
+      setAuthMessage('Profile saved. Welcome!');
+      navigate('dashboard');
+    } catch {
+      setAuthMessage('Could not connect to the server.');
+    }
+  }
+
   async function handleAuthSubmit(event) {
     event.preventDefault();
     setAuthMessage('');
 
-    const path = authMode === 'login' ? API.login : API.register;
-    let body =
-      authMode === 'login'
-        ? { email: authEmail, password: authPassword }
-        : { name: authName, email: authEmail, password: authPassword, role: userType };
+    if (authMode === 'register') {
+      try {
+        const { response, data } = await apiFetch(API.register, {
+          method: 'POST',
+          body: JSON.stringify({
+            name: authName,
+            email: authEmail,
+            password: authPassword,
+            role: userType,
+          }),
+        });
 
-    if (authMode === 'register' && userType === 'caregiver') {
-      if (!caregiverAvailability.trim()) {
-        setAuthMessage('Please enter your availability / free time.');
+        if (!response.ok) {
+          setAuthMessage(data?.error || 'Registration failed');
+          return;
+        }
+
+        setRegisterSuccess(true);
+        setAuthMessage(data.message || 'User created successfully');
+        setAuthPassword('');
+        setAuthName('');
+        return;
+      } catch {
+        setAuthMessage('Could not connect to the server.');
         return;
       }
-      if (
-        (caregiverCareType === 'pet' || caregiverCareType === 'both') &&
-        caregiverPetTypes.length === 0
-      ) {
-        setAuthMessage('Select at least one animal type you can care for.');
-        return;
-      }
-
-      body = {
-        ...body,
-        caregiverProfile: {
-          careType: caregiverCareType,
-          petTypes: caregiverCareType === 'plant' ? [] : caregiverPetTypes,
-          availability: caregiverAvailability.trim(),
-          location: caregiverLocation.trim(),
-          pricePerHour: caregiverPricePerHour,
-        },
-      };
     }
 
     try {
-      const { response, data } = await apiFetch(path, {
+      const { response, data } = await apiFetch(API.login, {
         method: 'POST',
-        body: JSON.stringify(body),
+        body: JSON.stringify({ email: authEmail, password: authPassword }),
       });
 
       if (!response.ok) {
@@ -350,22 +473,16 @@ export default function App() {
       }
 
       setAuthUser(data.user);
-      if (authMode === 'register') {
-        await loadSession();
-      }
-      setAuthMessage(
-        authMode === 'login'
-          ? `Welcome back, ${data.user.name}!`
-          : `Account created for ${data.user.name}`
-      );
-      setAuthName('');
-      setAuthEmail('');
       setAuthPassword('');
-      setCaregiverAvailability('');
-      setCaregiverLocation('');
-      setCaregiverPricePerHour('15');
-      setCaregiverCareType('pet');
-      setCaregiverPetTypes(['dog', 'cat']);
+
+      if (data.needsCaregiverProfile) {
+        setLoginCaregiverSetup(true);
+        setAuthMessage('Signed in. Complete your caregiver profile below.');
+        return;
+      }
+
+      setMySitterProfile(data.sitterProfile ?? null);
+      setAuthMessage(`Welcome back, ${data.user.name}!`);
       navigate(data.user.role === 'admin' ? 'admin' : 'dashboard');
     } catch {
       setAuthMessage('Could not connect to the server.');
@@ -380,6 +497,8 @@ export default function App() {
     }
     setAuthUser(null);
     setMySitterProfile(null);
+    setLoginCaregiverSetup(false);
+    setRegisterSuccess(false);
     setAdminStats(null);
     setBookings([]);
     setSitters([]);
@@ -490,124 +609,88 @@ export default function App() {
               <h2>{authMode === 'login' ? 'Login' : 'Register'}</h2>
               <p className="hero-note">
                 {authMode === 'login'
-                  ? 'Sign in to access the platform and view sitters and bookings.'
-                  : 'Create your account, choose your role, and start managing reservations.'}
+                  ? loginCaregiverSetup
+                    ? 'Tell owners what you care for and when you are available.'
+                    : 'Sign in to access the platform. Caregivers complete their service profile after login.'
+                  : 'Create your account. Caregivers set up services when they sign in.'}
               </p>
-              {authMode === 'login' && (
+              {authMode === 'login' && !loginCaregiverSetup && (
                 <p className="hero-note">
                   Demo: jane@petcare.test (owner) · admin@petcare.test (admin) · password123
                 </p>
               )}
-              <form onSubmit={handleAuthSubmit} className="auth-form">
-                {authMode === 'register' && (
+
+              {authMode === 'register' && registerSuccess ? (
+                <div className="register-success-panel">
+                  <p className="auth-feedback register-success-title">User created successfully</p>
+                  <p className="hero-note">
+                    Your account is ready. Sign in to continue
+                    {userType === 'caregiver' ? ' and set up your caregiver profile' : ''}.
+                  </p>
+                  <button
+                    type="button"
+                    className="action-btn auth-action"
+                    onClick={() => {
+                      setRegisterSuccess(false);
+                      setAuthMessage('');
+                      navigate('login');
+                    }}
+                  >
+                    Go to login
+                  </button>
+                </div>
+              ) : authMode === 'login' && loginCaregiverSetup ? (
+                <form onSubmit={handleCaregiverProfileSubmit} className="auth-form">
+                  {renderCaregiverProfileFields()}
+                  <button type="submit" className="action-btn auth-action">
+                    Save profile and continue
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={handleAuthSubmit} className="auth-form">
+                  {authMode === 'register' && (
+                    <label>
+                      Full name
+                      <input value={authName} onChange={(e) => setAuthName(e.target.value)} placeholder="Jane Doe" required />
+                    </label>
+                  )}
+
                   <label>
-                    Full name
-                    <input value={authName} onChange={(e) => setAuthName(e.target.value)} placeholder="Jane Doe" required />
+                    Email address
+                    <input type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} placeholder="jane@example.com" required />
                   </label>
-                )}
 
-                <label>
-                  Email address
-                  <input type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} placeholder="jane@example.com" required />
-                </label>
+                  <label>
+                    Password
+                    <input type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} placeholder="Enter password" required />
+                  </label>
 
-                <label>
-                  Password
-                  <input type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} placeholder="Enter password" required />
-                </label>
+                  {authMode === 'register' && (
+                    <div className="role-grid">
+                      <label className={userType === 'owner-pet' ? 'role-option active' : 'role-option'}>
+                        <input type="radio" name="userType" value="owner-pet" checked={userType === 'owner-pet'} onChange={() => setUserType('owner-pet')} />
+                        Pet Owner
+                      </label>
+                      <label className={userType === 'owner-plant' ? 'role-option active' : 'role-option'}>
+                        <input type="radio" name="userType" value="owner-plant" checked={userType === 'owner-plant'} onChange={() => setUserType('owner-plant')} />
+                        Plant Owner
+                      </label>
+                      <label className={userType === 'owner-mixed' ? 'role-option active' : 'role-option'}>
+                        <input type="radio" name="userType" value="owner-mixed" checked={userType === 'owner-mixed'} onChange={() => setUserType('owner-mixed')} />
+                        Mixed Owner
+                      </label>
+                      <label className={userType === 'caregiver' ? 'role-option active' : 'role-option'}>
+                        <input type="radio" name="userType" value="caregiver" checked={userType === 'caregiver'} onChange={() => setUserType('caregiver')} />
+                        Caregiver
+                      </label>
+                    </div>
+                  )}
 
-                {authMode === 'register' && (
-                  <div className="role-grid">
-                    <label className={userType === 'owner-pet' ? 'role-option active' : 'role-option'}>
-                      <input type="radio" name="userType" value="owner-pet" checked={userType === 'owner-pet'} onChange={() => setUserType('owner-pet')} />
-                      Pet Owner
-                    </label>
-                    <label className={userType === 'owner-plant' ? 'role-option active' : 'role-option'}>
-                      <input type="radio" name="userType" value="owner-plant" checked={userType === 'owner-plant'} onChange={() => setUserType('owner-plant')} />
-                      Plant Owner
-                    </label>
-                    <label className={userType === 'owner-mixed' ? 'role-option active' : 'role-option'}>
-                      <input type="radio" name="userType" value="owner-mixed" checked={userType === 'owner-mixed'} onChange={() => setUserType('owner-mixed')} />
-                      Mixed Owner
-                    </label>
-                    <label className={userType === 'caregiver' ? 'role-option active' : 'role-option'}>
-                      <input type="radio" name="userType" value="caregiver" checked={userType === 'caregiver'} onChange={() => setUserType('caregiver')} />
-                      Caregiver
-                    </label>
-                  </div>
-                )}
-
-                {authMode === 'register' && userType === 'caregiver' && (
-                  <fieldset className="caregiver-register-fields">
-                    <legend>Your caregiver profile</legend>
-
-                    <label>
-                      Care you provide
-                      <select
-                        value={caregiverCareType}
-                        onChange={(e) => setCaregiverCareType(e.target.value)}
-                      >
-                        <option value="pet">Pet care</option>
-                        <option value="plant">Plant care</option>
-                        <option value="both">Pet and plant care</option>
-                      </select>
-                    </label>
-
-                    {(caregiverCareType === 'pet' || caregiverCareType === 'both') && (
-                      <div className="pet-type-checkboxes">
-                        <span className="field-label">Animal types you care for</span>
-                        <div className="checkbox-row">
-                          {PET_TYPE_OPTIONS.map((option) => (
-                            <label key={option.value} className="checkbox-option">
-                              <input
-                                type="checkbox"
-                                checked={caregiverPetTypes.includes(option.value)}
-                                onChange={() => toggleCaregiverPetType(option.value)}
-                              />
-                              {option.label}
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <label>
-                      Availability / free time
-                      <textarea
-                        value={caregiverAvailability}
-                        onChange={(e) => setCaregiverAvailability(e.target.value)}
-                        placeholder="e.g. Weekdays 5pm–9pm, Saturdays all day"
-                        rows={3}
-                        required
-                      />
-                    </label>
-
-                    <label>
-                      Service area
-                      <input
-                        value={caregiverLocation}
-                        onChange={(e) => setCaregiverLocation(e.target.value)}
-                        placeholder="e.g. Downtown, Northside"
-                      />
-                    </label>
-
-                    <label>
-                      Hourly rate (USD)
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={caregiverPricePerHour}
-                        onChange={(e) => setCaregiverPricePerHour(e.target.value)}
-                      />
-                    </label>
-                  </fieldset>
-                )}
-
-                <button type="submit" className="action-btn auth-action">
-                  {authMode === 'login' ? 'Sign in' : 'Create account'}
-                </button>
-              </form>
+                  <button type="submit" className="action-btn auth-action">
+                    {authMode === 'login' ? 'Sign in' : 'Create account'}
+                  </button>
+                </form>
+              )}
 
               {authMessage && <p className="auth-feedback">{authMessage}</p>}
             </div>

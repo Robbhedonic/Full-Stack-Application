@@ -660,6 +660,17 @@ dd {
   min-height: 5rem;
 }
 
+.register-success-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.register-success-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--ok);
+}
+
 .caregiver-register-fields {
   margin: 0;
   padding: 1rem;

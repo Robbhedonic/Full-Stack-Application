@@ -1,14 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loginAs, resetTestState, startServer, stopServer } from './helpers.js';
+import { cookieHeaderFromResponse, resetTestState, startServer, stopServer } from './helpers.js';
 
 test.beforeEach(() => {
   resetTestState();
 });
 
-test('POST /api/auth/register creates sitter profile for caregivers', async () => {
+test('caregiver registers then completes profile on login', async () => {
   const { server, baseUrl } = startServer();
-  const email = `caregiver-${Date.now()}@example.com`;
+  const email = `caregiver-flow-${Date.now()}@example.com`;
+  const password = 'password123';
 
   try {
     const registerResponse = await fetch(`${baseUrl}/api/auth/register`, {
@@ -18,73 +19,112 @@ test('POST /api/auth/register creates sitter profile for caregivers', async () =
         Origin: 'http://localhost:5173',
       },
       body: JSON.stringify({
-        name: 'New Caregiver',
+        name: 'Flow Caregiver',
         email,
-        password: 'password123',
+        password,
         role: 'caregiver',
-        caregiverProfile: {
-          careType: 'pet',
-          petTypes: ['dog', 'rabbit'],
-          availability: 'Weekends 10am-6pm',
-          location: 'Riverside',
-          pricePerHour: 19,
-        },
       }),
     });
 
     assert.equal(registerResponse.status, 201);
     const registerData = await registerResponse.json();
-    assert.equal(registerData.user.role, 'caregiver');
+    assert.equal(registerData.message, 'User created successfully');
+
+    const loginResponse = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Origin: 'http://localhost:5173',
+      },
+      body: JSON.stringify({ email, password }),
+    });
+
+    assert.equal(loginResponse.status, 200);
+    const loginData = await loginResponse.json();
+    assert.equal(loginData.user.role, 'caregiver');
+    assert.equal(loginData.needsCaregiverProfile, true);
+    assert.equal(loginData.sitterProfile, null);
+
+    const cookie = cookieHeaderFromResponse(loginResponse);
+
+    const profileResponse = await fetch(`${baseUrl}/api/auth/caregiver-profile`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: cookie,
+        Origin: 'http://localhost:5173',
+      },
+      body: JSON.stringify({
+        caregiverProfile: {
+          careType: 'both',
+          petTypes: ['dog', 'cat'],
+          availability: 'Mon–Fri 6pm–10pm',
+          location: 'Central',
+          pricePerHour: 22,
+        },
+      }),
+    });
+
+    assert.equal(profileResponse.status, 201);
 
     const sittersResponse = await fetch(`${baseUrl}/api/sitters?type=pet`);
     const sittersData = await sittersResponse.json();
-    const created = sittersData.sitters.find((sitter) => sitter.name === 'New Caregiver');
+    const created = sittersData.sitters.find((sitter) => sitter.name === 'Flow Caregiver');
 
     assert.ok(created);
-    assert.equal(created.type, 'pet');
-    assert.deepEqual(created.petTypes, ['dog', 'rabbit']);
-    assert.equal(created.availability, 'Weekends 10am-6pm');
-    assert.equal(created.location, 'Riverside');
-    assert.equal(created.pricePerHour, 19);
-
-    const meResponse = await fetch(`${baseUrl}/api/auth/me`, {
-      headers: {
-        Cookie: registerResponse.headers.get('set-cookie')?.split(';')[0] ?? '',
-        Origin: 'http://localhost:5173',
-      },
-    });
-    assert.equal(meResponse.status, 200);
-    const meData = await meResponse.json();
-    assert.equal(meData.sitterProfile?.name, 'New Caregiver');
+    assert.equal(created.type, 'both');
+    assert.deepEqual(created.petTypes, ['dog', 'cat']);
+    assert.equal(created.availability, 'Mon–Fri 6pm–10pm');
   } finally {
     await stopServer(server);
   }
 });
 
-test('POST /api/auth/register rejects caregivers without availability', async () => {
+test('POST /api/auth/caregiver-profile rejects invalid payload', async () => {
   const { server, baseUrl } = startServer();
+  const email = `caregiver-bad-${Date.now()}@example.com`;
 
   try {
-    const response = await fetch(`${baseUrl}/api/auth/register`, {
+    await fetch(`${baseUrl}/api/auth/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Origin: 'http://localhost:5173',
       },
       body: JSON.stringify({
-        name: 'Incomplete Caregiver',
-        email: `incomplete-${Date.now()}@example.com`,
+        name: 'Bad Caregiver',
+        email,
         password: 'password123',
         role: 'caregiver',
+      }),
+    });
+
+    const loginResponse = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Origin: 'http://localhost:5173',
+      },
+      body: JSON.stringify({ email, password: 'password123' }),
+    });
+
+    const profileResponse = await fetch(`${baseUrl}/api/auth/caregiver-profile`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: cookieHeaderFromResponse(loginResponse),
+        Origin: 'http://localhost:5173',
+      },
+      body: JSON.stringify({
         caregiverProfile: {
-          careType: 'plant',
+          careType: 'pet',
           petTypes: [],
           availability: '   ',
         },
       }),
     });
 
-    assert.equal(response.status, 400);
+    assert.equal(profileResponse.status, 400);
   } finally {
     await stopServer(server);
   }

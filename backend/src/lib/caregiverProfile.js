@@ -48,7 +48,7 @@ export function buildSitterDescription({ careType, petTypes, availability, locat
 
 export function validateCaregiverProfile(profile) {
   if (!profile || typeof profile !== 'object') {
-    return 'Caregiver profile details are required';
+    return 'Complete your caregiver profile: care type, availability, and animal types (for pet care).';
   }
 
   const careType = normalizeCareType(profile.careType);

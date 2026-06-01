@@ -26,7 +26,7 @@ function attachSession(res, userId) {
 }
 
 router.post('/register', async (req, res) => {
-  const { name, email, password, role, caregiverProfile } = req.body;
+  const { name, email, password, role } = req.body;
 
   if (!name || !email || !password || !role) {
     return res.status(400).json({ error: 'Missing registration fields' });
@@ -50,30 +50,6 @@ router.post('/register', async (req, res) => {
     return res.status(409).json({ error: 'Email already registered' });
   }
 
-  if (prismaRole === UserRole.CAREGIVER) {
-    const profileError = validateCaregiverProfile(caregiverProfile);
-    if (profileError) {
-      return res.status(400).json({ error: profileError });
-    }
-
-    const sitterData = parseCaregiverProfile(caregiverProfile, name);
-
-    const user = await prisma.user.create({
-      data: {
-        name: name.trim(),
-        email: email.trim().toLowerCase(),
-        passwordHash: await bcrypt.hash(password, 10),
-        role: prismaRole,
-        sitterProfile: {
-          create: sitterData,
-        },
-      },
-    });
-
-    attachSession(res, user.id);
-    return res.status(201).json({ user: serializeUser(user) });
-  }
-
   const user = await prisma.user.create({
     data: {
       name: name.trim(),
@@ -83,8 +59,10 @@ router.post('/register', async (req, res) => {
     },
   });
 
-  attachSession(res, user.id);
-  return res.status(201).json({ user: serializeUser(user) });
+  return res.status(201).json({
+    user: serializeUser(user),
+    message: 'User created successfully',
+  });
 });
 
 router.post('/login', async (req, res) => {
@@ -96,6 +74,7 @@ router.post('/login', async (req, res) => {
 
   const user = await prisma.user.findUnique({
     where: { email: email.trim().toLowerCase() },
+    include: { sitterProfile: true },
   });
 
   if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
@@ -103,7 +82,53 @@ router.post('/login', async (req, res) => {
   }
 
   attachSession(res, user.id);
-  return res.json({ user: serializeUser(user) });
+
+  const needsCaregiverProfile =
+    user.role === UserRole.CAREGIVER && !user.sitterProfile;
+
+  return res.json({
+    user: serializeUser(user),
+    sitterProfile: user.sitterProfile ? serializeSitter(user.sitterProfile) : null,
+    needsCaregiverProfile,
+  });
+});
+
+router.post('/caregiver-profile', requireAuth, async (req, res) => {
+  if (req.user.role !== UserRole.CAREGIVER) {
+    return res.status(403).json({ error: 'Only caregivers can create a sitter profile' });
+  }
+
+  const existing = await prisma.sitterProfile.findUnique({
+    where: { userId: req.user.id },
+  });
+
+  if (existing) {
+    return res.status(409).json({ error: 'Caregiver profile already exists' });
+  }
+
+  const profilePayload =
+    req.body.caregiverProfile && typeof req.body.caregiverProfile === 'object'
+      ? req.body.caregiverProfile
+      : req.body;
+
+  const profileError = validateCaregiverProfile(profilePayload);
+  if (profileError) {
+    return res.status(400).json({ error: profileError });
+  }
+
+  const sitterData = parseCaregiverProfile(profilePayload, req.user.name);
+
+  const sitterProfile = await prisma.sitterProfile.create({
+    data: {
+      userId: req.user.id,
+      ...sitterData,
+    },
+  });
+
+  return res.status(201).json({
+    sitterProfile: serializeSitter(sitterProfile),
+    message: 'Caregiver profile saved',
+  });
 });
 
 router.post('/logout', (req, res) => {
