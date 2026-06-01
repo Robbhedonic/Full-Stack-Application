@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { API, apiFetch } from './api.js';
 import { pageToPath, pathToPage } from './routes.js';
+import AboutPage from './pages/AboutPage.jsx';
+import loginImage from './images/cat-black-being-loved.webp';
+import registerImage from './images/planst-care.webp';
+import homeImagePrimary from './images/Post-safe-houseplants-for-pets.jpg';
+import homeImageSecondary from './images/images.jpeg';
 
 const PET_TYPE_OPTIONS = [
   { value: 'dog', label: 'Dog' },
@@ -41,7 +46,7 @@ function formatBookingRange(startValue, durationHours) {
   const start = new Date(startValue);
   if (Number.isNaN(start.getTime())) return formatDate(startValue);
   const end = new Date(start.getTime() + durationHours * 60 * 60 * 1000);
-  return `${start.toLocaleString()} → ${end.toLocaleString()}`;
+  return `${start.toLocaleString()} - ${end.toLocaleString()}`;
 }
 
 export default function App() {
@@ -368,16 +373,48 @@ export default function App() {
               <button type="button" className="secondary-btn" onClick={() => navigate('login')}>
                 Login
               </button>
+              <button type="button" className="tertiary-btn" onClick={() => navigate('about')}>
+                About us
+              </button>
             </div>
+          </section>
+
+          <section className="page-visual home-visual" aria-label="Pet and plant care">
+            <figure className="page-image page-image-primary">
+              <img src={homeImagePrimary} alt="Safe houseplants alongside pets at home" />
+            </figure>
+            <figure className="page-image page-image-secondary">
+              <img src={homeImageSecondary} alt="Happy pets receiving attentive care" />
+            </figure>
           </section>
         </article>
       )}
 
+      {currentPage === 'about' && <AboutPage onBackHome={() => navigate('home')} />}
+
       {(currentPage === 'login' || currentPage === 'register') && (
-        <article className="status-card auth-page-card">
-          <button type="button" className="back-btn" onClick={() => navigate('home')}>
-            ← Back to home
+        <article
+          className={`status-card auth-page-card ${authMode === 'register' ? 'auth-page-register' : 'auth-page-login'}`}
+        >
+          <button type="button" className="back-btn auth-back-btn" onClick={() => navigate('home')}>
+            Back to home
           </button>
+
+          {authMode === 'login' && (
+            <section className="page-visual auth-visual" aria-label="Login">
+              <figure className="page-image">
+                <img src={loginImage} alt="Cat being cared for by a loving sitter" />
+              </figure>
+            </section>
+          )}
+
+          {authMode === 'register' && (
+            <section className="page-visual auth-visual" aria-label="Register">
+              <figure className="page-image">
+                <img src={registerImage} alt="Indoor plants receiving professional plant care" />
+              </figure>
+            </section>
+          )}
 
           <section className="auth-panel">
             <div className="auth-header">
@@ -471,7 +508,7 @@ export default function App() {
 
               <div className="hero-actions">
                 <button type="button" className="back-btn" onClick={() => navigate('home')}>
-                  ← Back to home
+                  Back to home
                 </button>
                 <button type="button" className="secondary-btn" onClick={loadAdminStats}>
                   Refresh stats
@@ -538,7 +575,7 @@ export default function App() {
                       <ul className="admin-list">
                         {adminStats.recentBookings.map((booking) => (
                           <li key={booking.id}>
-                            <strong>{booking.ownerName}</strong> → {booking.sitterName || 'sitter'} —{' '}
+                            <strong>{booking.ownerName}</strong> with {booking.sitterName || 'sitter'} —{' '}
                             {booking.serviceType} care
                             {booking.petType ? ` (${petTypeLabel(booking.petType)})` : ''}
                             <span>{booking.status}</span>
@@ -579,7 +616,7 @@ export default function App() {
 
           <div className="hero-actions dashboard-actions">
             <button type="button" className="back-btn" onClick={() => navigate('home')}>
-              ← Back to home
+              Back to home
             </button>
             <button type="button" className="secondary-btn" onClick={handleLogout}>
               Logout

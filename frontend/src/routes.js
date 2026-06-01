@@ -1,5 +1,6 @@
 const ROUTES = {
   home: '/home',
+  about: '/about',
   login: '/login',
   register: '/register',
   dashboard: '/dashboard',
@@ -17,6 +18,8 @@ export function pathToPage(pathname) {
     case '/':
     case '/home':
       return 'home';
+    case '/about':
+      return 'about';
     case '/login':
       return 'login';
     case '/register':
