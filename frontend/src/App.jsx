@@ -520,7 +520,7 @@ export default function App() {
               <p className="hero-note">
                 {authMode === 'login'
                   ? 'Sign in to access the platform. Caregivers manage services in Profile.'
-                  : 'Create your account, then sign in. Caregivers set up their profile after login.'}
+                  : 'Create your account, then sign in. Configure your account type and services from your Profile.'}
               </p>
               {authMode === 'login' && (
                 <p className="hero-note">
@@ -532,8 +532,7 @@ export default function App() {
                 <div className="register-success-panel">
                   <p className="auth-feedback register-success-title">User created successfully</p>
                   <p className="hero-note">
-                    Your account is ready. Sign in to continue
-                    {userType === 'caregiver' ? ' — then open Profile to add your services' : ''}.
+                    Your account is ready. Sign in to continue, then configure your account type and services in Profile.
                   </p>
                   <button
                     type="button"
@@ -565,27 +564,6 @@ export default function App() {
                     Password
                     <input type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} placeholder="Enter password" required />
                   </label>
-
-                  {authMode === 'register' && (
-                    <div className="role-grid">
-                      <label className={userType === 'owner-pet' ? 'role-option active' : 'role-option'}>
-                        <input type="radio" name="userType" value="owner-pet" checked={userType === 'owner-pet'} onChange={() => setUserType('owner-pet')} />
-                        Pet Owner
-                      </label>
-                      <label className={userType === 'owner-plant' ? 'role-option active' : 'role-option'}>
-                        <input type="radio" name="userType" value="owner-plant" checked={userType === 'owner-plant'} onChange={() => setUserType('owner-plant')} />
-                        Plant Owner
-                      </label>
-                      <label className={userType === 'owner-mixed' ? 'role-option active' : 'role-option'}>
-                        <input type="radio" name="userType" value="owner-mixed" checked={userType === 'owner-mixed'} onChange={() => setUserType('owner-mixed')} />
-                        Mixed Owner
-                      </label>
-                      <label className={userType === 'caregiver' ? 'role-option active' : 'role-option'}>
-                        <input type="radio" name="userType" value="caregiver" checked={userType === 'caregiver'} onChange={() => setUserType('caregiver')} />
-                        Caregiver
-                      </label>
-                    </div>
-                  )}
 
                   <button type="submit" className="action-btn auth-action">
                     {authMode === 'login' ? 'Sign in' : 'Create account'}

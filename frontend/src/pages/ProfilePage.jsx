@@ -44,6 +44,8 @@ function profileToFormState(profile) {
       careType: 'pet',
       petTypes: ['dog', 'cat'],
       availability: '',
+      availabilityStart: '',
+      availabilityEnd: '',
       location: '',
       pricePerHour: '15',
     };
@@ -53,6 +55,8 @@ function profileToFormState(profile) {
     careType: profile.type,
     petTypes: profile.petTypes ?? [],
     availability: profile.availability ?? '',
+    availabilityStart: '',
+    availabilityEnd: '',
     location: profile.location ?? '',
     pricePerHour: String(profile.pricePerHour ?? 15),
   };
@@ -93,12 +97,22 @@ export default function ProfilePage({
     }));
   }
 
+  function formatDatetimeLocal(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+  }
+
   function buildCaregiverPayload() {
+    const availabilityText = form.availabilityStart && form.availabilityEnd
+      ? `From ${formatDatetimeLocal(form.availabilityStart)} to ${formatDatetimeLocal(form.availabilityEnd)}`
+      : form.availability.trim();
+
     return {
       caregiverProfile: {
         careType: form.careType,
         petTypes: form.careType === 'plant' ? [] : form.petTypes,
-        availability: form.availability.trim(),
+        availability: availabilityText,
         location: form.location.trim(),
         pricePerHour: form.pricePerHour,
       },
@@ -106,10 +120,18 @@ export default function ProfilePage({
   }
 
   function validateCaregiverForm() {
-    if (!form.availability.trim()) {
-      setMessage('Enter your free time / hourly availability.');
+    if (!form.availabilityStart || !form.availabilityEnd) {
+      setMessage('Select both start and end availability dates for caregiver scheduling.');
       return false;
     }
+
+    const start = new Date(form.availabilityStart);
+    const end = new Date(form.availabilityEnd);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
+      setMessage('Availability end date must be after the start date.');
+      return false;
+    }
+
     if ((form.careType === 'pet' || form.careType === 'both') && form.petTypes.length === 0) {
       setMessage('Select at least one animal type you can care for.');
       return false;
@@ -299,12 +321,21 @@ export default function ProfilePage({
                 )}
 
                 <label>
-                  Free time / hourly availability
-                  <textarea
-                    value={form.availability}
-                    onChange={(e) => setForm((current) => ({ ...current, availability: e.target.value }))}
-                    placeholder="e.g. Mon–Fri 5pm–9pm, Sat 10am–6pm"
-                    rows={3}
+                  Available from
+                  <input
+                    type="datetime-local"
+                    value={form.availabilityStart}
+                    onChange={(e) => setForm((current) => ({ ...current, availabilityStart: e.target.value }))}
+                    required
+                  />
+                </label>
+
+                <label>
+                  Available until
+                  <input
+                    type="datetime-local"
+                    value={form.availabilityEnd}
+                    onChange={(e) => setForm((current) => ({ ...current, availabilityEnd: e.target.value }))}
                     required
                   />
                 </label>
