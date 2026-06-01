@@ -4,6 +4,7 @@ const ROUTES = {
   login: '/login',
   register: '/register',
   dashboard: '/dashboard',
+  profile: '/profile',
   admin: '/admin',
 };
 
@@ -26,6 +27,8 @@ export function pathToPage(pathname) {
       return 'register';
     case '/dashboard':
       return 'dashboard';
+    case '/profile':
+      return 'profile';
     case '/admin':
       return 'admin';
     default:

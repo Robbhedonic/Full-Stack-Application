@@ -7,6 +7,10 @@ export function isOwnerRole(role) {
   return OWNER_ROLES.has(role);
 }
 
+export function canCreateBookings(role) {
+  return isOwnerRole(role);
+}
+
 export async function bookingScopeForUser(user) {
   if (user.role === UserRole.ADMIN) {
     return null;

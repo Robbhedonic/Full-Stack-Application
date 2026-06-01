@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { API, apiFetch } from './api.js';
 import { pageToPath, pathToPage } from './routes.js';
 import AboutPage from './pages/AboutPage.jsx';
+import ProfilePage from './pages/ProfilePage.jsx';
 import loginImage from './images/cat-black-being-loved.webp';
 import registerImage from './images/planst-care.webp';
 import homeImagePrimary from './images/Post-safe-houseplants-for-pets.jpg';
@@ -24,8 +25,12 @@ function isOwnerRole(role) {
   return ['owner-pet', 'owner-plant', 'owner-mixed'].includes(role);
 }
 
-function isCaregiverRole(role) {
-  return role === 'caregiver';
+function seeksCare(accountMode) {
+  return accountMode === 'owner' || accountMode === 'both';
+}
+
+function offersCare(accountMode) {
+  return accountMode === 'caregiver' || accountMode === 'both';
 }
 
 function formatDate(value) {
@@ -72,13 +77,8 @@ export default function App() {
   const [authMessage, setAuthMessage] = useState('');
   const [adminStats, setAdminStats] = useState(null);
   const [mySitterProfile, setMySitterProfile] = useState(null);
-  const [caregiverCareType, setCaregiverCareType] = useState('pet');
-  const [caregiverPetTypes, setCaregiverPetTypes] = useState(['dog', 'cat']);
-  const [caregiverAvailability, setCaregiverAvailability] = useState('');
-  const [caregiverLocation, setCaregiverLocation] = useState('');
-  const [caregiverPricePerHour, setCaregiverPricePerHour] = useState('15');
+  const [accountMode, setAccountMode] = useState('owner');
   const [registerSuccess, setRegisterSuccess] = useState(false);
-  const [loginCaregiverSetup, setLoginCaregiverSetup] = useState(false);
 
   function roleLabel(role) {
     const labels = {
@@ -99,8 +99,6 @@ export default function App() {
       setAuthMode(page);
       if (page === 'login') {
         setRegisterSuccess(false);
-      } else {
-        setLoginCaregiverSetup(false);
       }
     }
   }, []);
@@ -132,17 +130,13 @@ export default function App() {
       const { response, data } = await apiFetch(API.me);
       setAuthUser(response.ok ? data.user : null);
       setMySitterProfile(response.ok ? data.sitterProfile ?? null : null);
+      setAccountMode(response.ok ? data.accountMode ?? 'owner' : 'owner');
     } catch {
       setAuthUser(null);
       setMySitterProfile(null);
+      setAccountMode('owner');
     }
   }, []);
-
-  function toggleCaregiverPetType(value) {
-    setCaregiverPetTypes((current) =>
-      current.includes(value) ? current.filter((item) => item !== value) : [...current, value]
-    );
-  }
 
   function formatSitterPetTypes(petTypes) {
     if (!petTypes?.length) return null;
@@ -204,6 +198,12 @@ export default function App() {
       setMessage('Unable to load admin statistics.');
     }
   }, []);
+
+  useEffect(() => {
+    if (currentPage === 'profile' && authUser) {
+      loadSession();
+    }
+  }, [currentPage, authUser, loadSession]);
 
   useEffect(() => {
     if (authUser?.role === 'admin') {
@@ -310,125 +310,6 @@ export default function App() {
     }
   }
 
-  function buildCaregiverProfilePayload() {
-    return {
-      careType: caregiverCareType,
-      petTypes: caregiverCareType === 'plant' ? [] : caregiverPetTypes,
-      availability: caregiverAvailability.trim(),
-      location: caregiverLocation.trim(),
-      pricePerHour: caregiverPricePerHour,
-    };
-  }
-
-  function validateCaregiverProfileForm() {
-    if (!caregiverAvailability.trim()) {
-      setAuthMessage('Enter your hourly availability / free time.');
-      return false;
-    }
-    if (
-      (caregiverCareType === 'pet' || caregiverCareType === 'both') &&
-      caregiverPetTypes.length === 0
-    ) {
-      setAuthMessage('Select at least one animal type you care for.');
-      return false;
-    }
-    return true;
-  }
-
-  function renderCaregiverProfileFields() {
-    return (
-      <fieldset className="caregiver-register-fields">
-        <legend>What you offer as a caregiver</legend>
-
-        <label>
-          Care you provide
-          <select value={caregiverCareType} onChange={(e) => setCaregiverCareType(e.target.value)}>
-            <option value="pet">Pet care</option>
-            <option value="plant">Plant care</option>
-            <option value="both">Pet and plant care</option>
-          </select>
-        </label>
-
-        {(caregiverCareType === 'pet' || caregiverCareType === 'both') && (
-          <div className="pet-type-checkboxes">
-            <span className="field-label">What you care for (checkboxes)</span>
-            <div className="checkbox-row">
-              {PET_TYPE_OPTIONS.map((option) => (
-                <label key={option.value} className="checkbox-option">
-                  <input
-                    type="checkbox"
-                    checked={caregiverPetTypes.includes(option.value)}
-                    onChange={() => toggleCaregiverPetType(option.value)}
-                  />
-                  {option.label}
-                </label>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <label>
-          Hourly availability / free time
-          <textarea
-            value={caregiverAvailability}
-            onChange={(e) => setCaregiverAvailability(e.target.value)}
-            placeholder="e.g. Mon–Fri 5pm–9pm, Sat 10am–6pm"
-            rows={3}
-            required
-          />
-        </label>
-
-        <label>
-          Service area
-          <input
-            value={caregiverLocation}
-            onChange={(e) => setCaregiverLocation(e.target.value)}
-            placeholder="e.g. Downtown, Northside"
-          />
-        </label>
-
-        <label>
-          Hourly rate (USD)
-          <input
-            type="number"
-            min="0"
-            step="1"
-            value={caregiverPricePerHour}
-            onChange={(e) => setCaregiverPricePerHour(e.target.value)}
-          />
-        </label>
-      </fieldset>
-    );
-  }
-
-  async function handleCaregiverProfileSubmit(event) {
-    event.preventDefault();
-    setAuthMessage('');
-
-    if (!validateCaregiverProfileForm()) {
-      return;
-    }
-
-    try {
-      const { response, data } = await apiFetch(API.caregiverProfile, {
-        method: 'POST',
-        body: JSON.stringify({ caregiverProfile: buildCaregiverProfilePayload() }),
-      });
-
-      if (!response.ok) {
-        setAuthMessage(data?.error || 'Could not save caregiver profile');
-        return;
-      }
-
-      setMySitterProfile(data.sitterProfile);
-      setLoginCaregiverSetup(false);
-      setAuthMessage('Profile saved. Welcome!');
-      navigate('dashboard');
-    } catch {
-      setAuthMessage('Could not connect to the server.');
-    }
-  }
-
   async function handleAuthSubmit(event) {
     event.preventDefault();
     setAuthMessage('');
@@ -473,17 +354,16 @@ export default function App() {
       }
 
       setAuthUser(data.user);
-      setAuthPassword('');
-
-      if (data.needsCaregiverProfile) {
-        setLoginCaregiverSetup(true);
-        setAuthMessage('Signed in. Complete your caregiver profile below.');
-        return;
-      }
-
       setMySitterProfile(data.sitterProfile ?? null);
+      setAccountMode(data.accountMode ?? 'owner');
+      setAuthPassword('');
       setAuthMessage(`Welcome back, ${data.user.name}!`);
-      navigate(data.user.role === 'admin' ? 'admin' : 'dashboard');
+
+      if (data.user.role === 'admin') {
+        navigate('admin');
+      } else {
+        navigate('profile');
+      }
     } catch {
       setAuthMessage('Could not connect to the server.');
     }
@@ -497,7 +377,7 @@ export default function App() {
     }
     setAuthUser(null);
     setMySitterProfile(null);
-    setLoginCaregiverSetup(false);
+    setAccountMode('owner');
     setRegisterSuccess(false);
     setAdminStats(null);
     setBookings([]);
@@ -571,6 +451,36 @@ export default function App() {
 
       {currentPage === 'about' && <AboutPage onBackHome={() => navigate('home')} />}
 
+      {currentPage === 'profile' && (
+        <>
+          {!authUser ? (
+            <article className="status-card profile-page-card">
+              <h2>Sign in required</h2>
+              <p>Please sign in to view your profile.</p>
+              <button type="button" className="action-btn" onClick={() => navigate('login')}>
+                Go to login
+              </button>
+            </article>
+          ) : authUser.role === 'admin' ? (
+            <article className="status-card profile-page-card">
+              <button type="button" className="back-btn" onClick={() => navigate('admin')}>
+                Back to admin
+              </button>
+              <h1>Admin account</h1>
+              <p className="hero-note">Use the admin dashboard for platform statistics.</p>
+            </article>
+          ) : (
+            <ProfilePage
+              authUser={authUser}
+              accountMode={accountMode}
+              sitterProfile={mySitterProfile}
+              onProfileChange={loadSession}
+              onNavigate={navigate}
+            />
+          )}
+        </>
+      )}
+
       {(currentPage === 'login' || currentPage === 'register') && (
         <article
           className={`status-card auth-page-card ${authMode === 'register' ? 'auth-page-register' : 'auth-page-login'}`}
@@ -609,12 +519,10 @@ export default function App() {
               <h2>{authMode === 'login' ? 'Login' : 'Register'}</h2>
               <p className="hero-note">
                 {authMode === 'login'
-                  ? loginCaregiverSetup
-                    ? 'Tell owners what you care for and when you are available.'
-                    : 'Sign in to access the platform. Caregivers complete their service profile after login.'
-                  : 'Create your account. Caregivers set up services when they sign in.'}
+                  ? 'Sign in to access the platform. Caregivers manage services in Profile.'
+                  : 'Create your account, then sign in. Caregivers set up their profile after login.'}
               </p>
-              {authMode === 'login' && !loginCaregiverSetup && (
+              {authMode === 'login' && (
                 <p className="hero-note">
                   Demo: jane@petcare.test (owner) · admin@petcare.test (admin) · password123
                 </p>
@@ -625,7 +533,7 @@ export default function App() {
                   <p className="auth-feedback register-success-title">User created successfully</p>
                   <p className="hero-note">
                     Your account is ready. Sign in to continue
-                    {userType === 'caregiver' ? ' and set up your caregiver profile' : ''}.
+                    {userType === 'caregiver' ? ' — then open Profile to add your services' : ''}.
                   </p>
                   <button
                     type="button"
@@ -639,13 +547,6 @@ export default function App() {
                     Go to login
                   </button>
                 </div>
-              ) : authMode === 'login' && loginCaregiverSetup ? (
-                <form onSubmit={handleCaregiverProfileSubmit} className="auth-form">
-                  {renderCaregiverProfileFields()}
-                  <button type="submit" className="action-btn auth-action">
-                    Save profile and continue
-                  </button>
-                </form>
               ) : (
                 <form onSubmit={handleAuthSubmit} className="auth-form">
                   {authMode === 'register' && (
@@ -818,9 +719,11 @@ export default function App() {
           <section className="section-header">
             <h2>Welcome, {authUser.name}</h2>
             <p>
-              {isCaregiverRole(authUser.role)
-                ? 'View owners who booked your care services.'
-                : 'Browse the marketplace and manage your pet or plant care reservations.'}
+              {offersCare(accountMode) && seeksCare(accountMode)
+                ? 'Book care for your pets and manage clients who booked you.'
+                : offersCare(accountMode)
+                  ? 'View owners who booked your care services.'
+                  : 'Browse the marketplace and manage your pet care reservations.'}
             </p>
           </section>
 
@@ -828,55 +731,45 @@ export default function App() {
             <button type="button" className="back-btn" onClick={() => navigate('home')}>
               Back to home
             </button>
+            <button type="button" className="secondary-btn" onClick={() => navigate('profile')}>
+              My profile
+            </button>
             <button type="button" className="secondary-btn" onClick={handleLogout}>
               Logout
             </button>
           </div>
 
-          <div className="dashboard-stack">
-            {isCaregiverRole(authUser.role) && mySitterProfile && (
-              <section className="panel caregiver-profile-panel">
-                <h3>Your public sitter listing</h3>
-                <p className="hero-note">Owners see this profile when booking care.</p>
-                <ul className="caregiver-profile-details">
-                  <li>
-                    <strong>Services:</strong> {careTypeLabel(mySitterProfile.type)}
-                  </li>
-                  {mySitterProfile.petTypes?.length > 0 && (
-                    <li>
-                      <strong>Animals:</strong> {formatSitterPetTypes(mySitterProfile.petTypes)}
-                    </li>
-                  )}
-                  {mySitterProfile.availability && (
-                    <li>
-                      <strong>Availability:</strong> {mySitterProfile.availability}
-                    </li>
-                  )}
-                  <li>
-                    <strong>Area:</strong> {mySitterProfile.location}
-                  </li>
-                  <li>
-                    <strong>Rate:</strong> ${mySitterProfile.pricePerHour}/hr
-                  </li>
-                </ul>
-                <p>{mySitterProfile.description}</p>
-              </section>
-            )}
+          {offersCare(accountMode) && !mySitterProfile && (
+            <p className="auth-feedback">
+              Complete your caregiver listing in{' '}
+              <button type="button" className="link-btn" onClick={() => navigate('profile')}>
+                Profile
+              </button>
+              .
+            </p>
+          )}
 
+          <div className="dashboard-stack">
             <section className="panel bookings-panel">
-              <h3>{isCaregiverRole(authUser.role) ? 'Clients who booked you' : 'Your reservations'}</h3>
+              <h3>Your bookings</h3>
               {bookings.length === 0 ? (
                 <p>
-                  {isCaregiverRole(authUser.role)
+                  {offersCare(accountMode) && !seeksCare(accountMode)
                     ? 'No one has booked your services yet.'
                     : 'No bookings yet. Create your first care request below.'}
                 </p>
               ) : (
                 <ul className="booking-list">
-                  {bookings.map((booking) => (
+                  {bookings.map((booking) => {
+                    const isIncoming =
+                      offersCare(accountMode) &&
+                      mySitterProfile &&
+                      booking.sitterId === mySitterProfile.id;
+
+                    return (
                     <li key={booking.id} className="booking-item">
                       <div className="booking-item-main">
-                        {isCaregiverRole(authUser.role) ? (
+                        {isIncoming ? (
                           <>
                             <strong>{booking.ownerName}</strong> booked you for{' '}
                             <strong>{booking.serviceType}</strong> care
@@ -897,12 +790,13 @@ export default function App() {
                         <span>{booking.status}</span>
                       </div>
                     </li>
-                  ))}
+                    );
+                  })}
                 </ul>
               )}
             </section>
 
-            {isOwnerRole(authUser.role) && (
+            {seeksCare(accountMode) && (
               <>
                 <section className="panel">
                   <h3>Available sitters ({serviceType} care)</h3>

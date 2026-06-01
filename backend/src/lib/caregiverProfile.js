@@ -78,7 +78,7 @@ export function validateCaregiverProfile(profile) {
   return null;
 }
 
-export function parseCaregiverProfile(profile, name) {
+export function parseCaregiverProfile(profile, name, existingRating = 5) {
   const careType = normalizeCareType(profile.careType);
   const petTypes = normalizePetTypes(profile.petTypes);
   const availability = profile.availability.toString().trim();
@@ -94,9 +94,16 @@ export function parseCaregiverProfile(profile, name) {
     type: careType,
     petTypes: careType === 'plant' ? null : petTypes.join(','),
     availability,
-    rating: 5,
+    rating: existingRating,
     pricePerHour,
     location,
     description: buildSitterDescription({ careType, petTypes, availability, location }),
   };
+}
+
+export function extractCaregiverProfilePayload(body) {
+  if (body.caregiverProfile && typeof body.caregiverProfile === 'object') {
+    return body.caregiverProfile;
+  }
+  return body;
 }

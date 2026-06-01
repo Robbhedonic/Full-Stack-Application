@@ -2,7 +2,17 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { UserRole } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
-import { parseCaregiverProfile, validateCaregiverProfile } from '../lib/caregiverProfile.js';
+import {
+  accountModeRequiresSitterProfile,
+  deriveAccountMode,
+  normalizeAccountMode,
+  roleForAccountMode,
+} from '../lib/accountMode.js';
+import {
+  extractCaregiverProfilePayload,
+  parseCaregiverProfile,
+  validateCaregiverProfile,
+} from '../lib/caregiverProfile.js';
 import { parseClientRole, serializeSitter, serializeUser } from '../lib/serializers.js';
 import { createSession, deleteSession, getSessionUserId } from '../lib/sessions.js';
 import { SESSION_COOKIE, requireAuth } from '../middleware/auth.js';
@@ -23,6 +33,14 @@ function sessionCookieOptions() {
 function attachSession(res, userId) {
   const sessionId = createSession(userId);
   res.cookie(SESSION_COOKIE, sessionId, sessionCookieOptions());
+}
+
+function buildAuthResponse(user, sitterProfile) {
+  return {
+    user: serializeUser(user),
+    sitterProfile: sitterProfile ? serializeSitter(sitterProfile) : null,
+    accountMode: deriveAccountMode(user, sitterProfile),
+  };
 }
 
 router.post('/register', async (req, res) => {
@@ -83,51 +101,142 @@ router.post('/login', async (req, res) => {
 
   attachSession(res, user.id);
 
-  const needsCaregiverProfile =
-    user.role === UserRole.CAREGIVER && !user.sitterProfile;
-
-  return res.json({
-    user: serializeUser(user),
-    sitterProfile: user.sitterProfile ? serializeSitter(user.sitterProfile) : null,
-    needsCaregiverProfile,
-  });
+  return res.json(buildAuthResponse(user, user.sitterProfile));
 });
 
-router.post('/caregiver-profile', requireAuth, async (req, res) => {
-  if (req.user.role !== UserRole.CAREGIVER) {
-    return res.status(403).json({ error: 'Only caregivers can create a sitter profile' });
+async function saveCaregiverProfile(req, res, { create }) {
+  if (req.user.role === UserRole.ADMIN) {
+    return res.status(403).json({ error: 'Admins cannot manage a sitter profile' });
   }
 
   const existing = await prisma.sitterProfile.findUnique({
     where: { userId: req.user.id },
   });
 
-  if (existing) {
+  if (create && existing) {
     return res.status(409).json({ error: 'Caregiver profile already exists' });
   }
 
-  const profilePayload =
-    req.body.caregiverProfile && typeof req.body.caregiverProfile === 'object'
-      ? req.body.caregiverProfile
-      : req.body;
+  if (!create && !existing) {
+    return res.status(404).json({ error: 'Caregiver profile not found' });
+  }
 
+  const profilePayload = extractCaregiverProfilePayload(req.body);
   const profileError = validateCaregiverProfile(profilePayload);
   if (profileError) {
     return res.status(400).json({ error: profileError });
   }
 
-  const sitterData = parseCaregiverProfile(profilePayload, req.user.name);
+  const sitterData = parseCaregiverProfile(
+    profilePayload,
+    req.user.name,
+    existing?.rating ?? 5
+  );
 
-  const sitterProfile = await prisma.sitterProfile.create({
+  const sitterProfile = create
+    ? await prisma.sitterProfile.create({
+        data: { userId: req.user.id, ...sitterData },
+      })
+    : await prisma.sitterProfile.update({
+        where: { userId: req.user.id },
+        data: sitterData,
+      });
+
+  const updatedUser = await prisma.user.findUnique({ where: { id: req.user.id } });
+
+  return res.status(create ? 201 : 200).json({
+    ...buildAuthResponse(updatedUser, sitterProfile),
+    message: create ? 'Caregiver profile created' : 'Caregiver profile updated',
+  });
+}
+
+router.post('/caregiver-profile', requireAuth, (req, res) =>
+  saveCaregiverProfile(req, res, { create: true })
+);
+
+router.put('/caregiver-profile', requireAuth, (req, res) =>
+  saveCaregiverProfile(req, res, { create: false })
+);
+
+router.put('/account-mode', requireAuth, async (req, res) => {
+  if (req.user.role === UserRole.ADMIN) {
+    return res.status(403).json({ error: 'Admins cannot change account mode here' });
+  }
+
+  const mode = normalizeAccountMode(req.body.mode);
+  if (!mode) {
+    return res.status(400).json({ error: 'Mode must be owner, caregiver, or both' });
+  }
+
+  const existingSitter = await prisma.sitterProfile.findUnique({
+    where: { userId: req.user.id },
+  });
+
+  if (mode === 'owner' && existingSitter) {
+    const bookingCount = await prisma.booking.count({
+      where: { sitterId: existingSitter.id },
+    });
+
+    if (bookingCount > 0) {
+      return res.status(400).json({
+        error: 'Cannot switch to owner-only while you have active bookings as a caregiver.',
+      });
+    }
+
+    await prisma.sitterProfile.delete({ where: { userId: req.user.id } });
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: { id: req.user.id },
     data: {
-      userId: req.user.id,
-      ...sitterData,
+      role: roleForAccountMode(mode),
+      profileMode: mode,
     },
   });
 
-  return res.status(201).json({
-    sitterProfile: serializeSitter(sitterProfile),
-    message: 'Caregiver profile saved',
+  const sitterProfile = await prisma.sitterProfile.findUnique({
+    where: { userId: req.user.id },
+  });
+
+  if (accountModeRequiresSitterProfile(mode) && !sitterProfile) {
+    return res.json({
+      ...buildAuthResponse(updatedUser, null),
+      message: 'Account mode saved. Add your caregiver details below.',
+    });
+  }
+
+  return res.json({
+    ...buildAuthResponse(updatedUser, sitterProfile),
+    message: 'Account mode updated',
+  });
+});
+
+router.delete('/caregiver-profile', requireAuth, async (req, res) => {
+  const existing = await prisma.sitterProfile.findUnique({
+    where: { userId: req.user.id },
+  });
+
+  if (!existing) {
+    return res.status(404).json({ error: 'Caregiver profile not found' });
+  }
+
+  const bookingCount = await prisma.booking.count({
+    where: { sitterId: existing.id },
+  });
+
+  if (bookingCount > 0) {
+    return res.status(400).json({
+      error: 'Cannot delete profile while you have bookings. Complete or cancel them first.',
+    });
+  }
+
+  await prisma.sitterProfile.delete({ where: { userId: req.user.id } });
+
+  const updatedUser = await prisma.user.findUnique({ where: { id: req.user.id } });
+
+  return res.json({
+    ...buildAuthResponse(updatedUser, null),
+    message: 'Caregiver profile deleted',
   });
 });
 
@@ -153,10 +262,7 @@ router.get('/me', async (req, res) => {
     return res.status(401).json({ error: 'Invalid session' });
   }
 
-  return res.json({
-    user: serializeUser(user),
-    sitterProfile: user.sitterProfile ? serializeSitter(user.sitterProfile) : null,
-  });
+  return res.json(buildAuthResponse(user, user.sitterProfile));
 });
 
 router.get('/protected', requireAuth, (req, res) => {

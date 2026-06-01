@@ -21,6 +21,7 @@ model User {
   passwordHash  String
   name          String
   role          UserRole
+  profileMode   String?
   createdAt     DateTime       @default(now())
   sitterProfile SitterProfile?
   bookings      Booking[]      @relation("OwnerBookings")

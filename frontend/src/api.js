@@ -29,6 +29,7 @@ export const API = {
   login: '/api/auth/login',
   register: '/api/auth/register',
   caregiverProfile: '/api/auth/caregiver-profile',
+  accountMode: '/api/auth/account-mode',
   logout: '/api/auth/logout',
   sitters: '/api/sitters',
   bookings: '/api/bookings',
