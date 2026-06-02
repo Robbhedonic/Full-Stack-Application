@@ -22,6 +22,21 @@ test('GET /api/sitters returns seeded sitters', async () => {
   }
 });
 
+test('GET /api/health allows CORS from the frontend origin', async () => {
+  const { server, baseUrl } = startServer();
+
+  try {
+    const response = await fetch(`${baseUrl}/api/health`, {
+      headers: { Origin: 'http://localhost:5173' },
+    });
+
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('access-control-allow-origin'), 'http://localhost:5173');
+  } finally {
+    await stopServer(server);
+  }
+});
+
 test('POST /api/bookings creates a booking when authenticated', async () => {
   const { server, baseUrl } = startServer();
 
