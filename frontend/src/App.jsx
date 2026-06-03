@@ -321,9 +321,6 @@ export default function App() {
     }
 
     loadBookings();
-    if (authUser.name) {
-      setOwnerName((current) => current || authUser.name);
-    }
     if (seeksCare(accountMode)) {
       loadSitters();
     }
