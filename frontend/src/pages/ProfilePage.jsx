@@ -26,6 +26,32 @@ function careTypeLabel(type) {
   return labels[type] ?? type;
 }
 
+function toDatetimeLocalValue(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const offsetMs = date.getTimezoneOffset() * 60 * 1000;
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
+}
+
+function parseAvailabilityFromText(availabilityText) {
+  if (!availabilityText?.trim()) {
+    return { availabilityStart: '', availabilityEnd: '' };
+  }
+
+  const match = availabilityText.match(/^From\s+(.+?)\s+to\s+(.+)$/i);
+  if (!match) {
+    return { availabilityStart: '', availabilityEnd: '' };
+  }
+
+  const start = new Date(match[1].trim());
+  const end = new Date(match[2].trim());
+  return {
+    availabilityStart: toDatetimeLocalValue(start),
+    availabilityEnd: toDatetimeLocalValue(end),
+  };
+}
+
 function profileToFormState(profile) {
   if (!profile) {
     return {
@@ -39,12 +65,20 @@ function profileToFormState(profile) {
     };
   }
 
+  const parsedFromText = parseAvailabilityFromText(profile.availability);
+  const availabilityStart = profile.availabilityStart
+    ? toDatetimeLocalValue(profile.availabilityStart)
+    : parsedFromText.availabilityStart;
+  const availabilityEnd = profile.availabilityEnd
+    ? toDatetimeLocalValue(profile.availabilityEnd)
+    : parsedFromText.availabilityEnd;
+
   return {
     careType: profile.type,
     petTypes: profile.petTypes ?? [],
     availability: profile.availability ?? '',
-    availabilityStart: '',
-    availabilityEnd: '',
+    availabilityStart,
+    availabilityEnd,
     location: profile.location ?? '',
     pricePerHour: String(profile.pricePerHour ?? 15),
   };
@@ -127,10 +161,24 @@ export default function ProfilePage({
         careType: form.careType,
         petTypes: form.careType === 'plant' ? [] : form.petTypes,
         availability: availabilityText,
+        availabilityStart: form.availabilityStart || undefined,
+        availabilityEnd: form.availabilityEnd || undefined,
         location: form.location.trim(),
         pricePerHour: form.pricePerHour,
       },
     };
+  }
+
+  function startEditingCaregiver() {
+    setForm(profileToFormState(sitterProfile));
+    setEditingCaregiver(true);
+    setFeedback(null);
+  }
+
+  function cancelEditingCaregiver() {
+    setForm(profileToFormState(sitterProfile));
+    setEditingCaregiver(false);
+    setFeedback(null);
   }
 
   function validateOwnerForm() {
@@ -189,6 +237,9 @@ export default function ProfilePage({
 
   function validateCaregiverForm() {
     if (!form.availabilityStart || !form.availabilityEnd) {
+      if (hasProfile && form.availability.trim()) {
+        return true;
+      }
       showError('Select both start and end availability dates for caregiver scheduling.');
       return false;
     }
@@ -373,7 +424,7 @@ export default function ProfilePage({
                   </li>
                 </ul>
                 <div className="profile-actions">
-                  <button type="button" className="secondary-btn" onClick={() => setEditingCaregiver(true)}>
+                  <button type="button" className="secondary-btn" onClick={startEditingCaregiver}>
                     Edit caregiver details
                   </button>
                   <button type="button" className="secondary-btn" onClick={handleDeleteCaregiverProfile} disabled={isSaving}>
@@ -456,7 +507,7 @@ export default function ProfilePage({
                 </label>
 
                 {hasProfile && (
-                  <button type="button" className="secondary-btn" onClick={() => setEditingCaregiver(false)}>
+                  <button type="button" className="secondary-btn" onClick={cancelEditingCaregiver}>
                     Cancel edit
                   </button>
                 )}

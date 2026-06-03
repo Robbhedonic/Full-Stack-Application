@@ -52,9 +52,11 @@ model SitterProfile {
   user         User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
   name         String
   type         String
-  petTypes     String?
-  availability String?
-  rating       Float
+  petTypes           String?
+  availability       String?
+  availabilityStart  DateTime?
+  availabilityEnd    DateTime?
+  rating             Float
   pricePerHour Int
   description  String
   location     String

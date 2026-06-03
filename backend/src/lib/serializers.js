@@ -11,6 +11,8 @@ export function serializeSitter(sitter) {
           .filter(Boolean)
       : [],
     availability,
+    availabilityStart: sitter.availabilityStart?.toISOString() ?? null,
+    availabilityEnd: sitter.availabilityEnd?.toISOString() ?? null,
     isAvailable: Boolean(availability?.trim()),
     rating: sitter.rating,
     pricePerHour: sitter.pricePerHour,

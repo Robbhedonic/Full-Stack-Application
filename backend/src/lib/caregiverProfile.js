@@ -23,6 +23,15 @@ export function normalizePetTypes(petTypes) {
   return [...new Set(petTypes.map((value) => value?.toString().toLowerCase().trim()).filter(Boolean))];
 }
 
+export function formatAvailabilityLabel(startDate, endDate) {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return '';
+  }
+  return `From ${start.toLocaleString()} to ${end.toLocaleString()}`;
+}
+
 export function buildSitterDescription({ careType, petTypes, availability, location }) {
   const parts = [];
 
@@ -56,9 +65,18 @@ export function validateCaregiverProfile(profile) {
     return 'Care type must be pet, plant, or both';
   }
 
+  const hasRange = profile.availabilityStart && profile.availabilityEnd;
   const availability = profile.availability?.toString().trim();
-  if (!availability) {
+  if (!hasRange && !availability) {
     return 'Availability / free time is required';
+  }
+
+  if (hasRange) {
+    const start = new Date(profile.availabilityStart);
+    const end = new Date(profile.availabilityEnd);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
+      return 'Availability end date must be after the start date';
+    }
   }
 
   const petTypes = normalizePetTypes(profile.petTypes);
@@ -81,8 +99,21 @@ export function validateCaregiverProfile(profile) {
 export function parseCaregiverProfile(profile, name, existingRating = 5) {
   const careType = normalizeCareType(profile.careType);
   const petTypes = normalizePetTypes(profile.petTypes);
-  const availability = profile.availability.toString().trim();
   const location = profile.location?.toString().trim() || 'Local area';
+
+  let availabilityStart = null;
+  let availabilityEnd = null;
+  let availability = profile.availability?.toString().trim() ?? '';
+
+  if (profile.availabilityStart && profile.availabilityEnd) {
+    availabilityStart = new Date(profile.availabilityStart);
+    availabilityEnd = new Date(profile.availabilityEnd);
+    availability = formatAvailabilityLabel(availabilityStart, availabilityEnd);
+  }
+
+  if (!availability) {
+    availability = 'Contact for availability';
+  }
   const parsedPrice = Number(profile.pricePerHour);
   const pricePerHour =
     profile.pricePerHour === undefined || profile.pricePerHour === '' || Number.isNaN(parsedPrice)
@@ -94,6 +125,8 @@ export function parseCaregiverProfile(profile, name, existingRating = 5) {
     type: careType,
     petTypes: careType === 'plant' ? null : petTypes.join(','),
     availability,
+    availabilityStart,
+    availabilityEnd,
     rating: existingRating,
     pricePerHour,
     location,
