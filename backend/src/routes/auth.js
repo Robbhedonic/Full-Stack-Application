@@ -191,6 +191,99 @@ router.put('/owner-care', requireAuth, async (req, res) => {
   });
 });
 
+router.put('/profile', requireAuth, async (req, res) => {
+  if (req.user.role === UserRole.ADMIN) {
+    return res.status(403).json({ error: 'Admins cannot update profile here' });
+  }
+
+  const mode = req.body.mode != null ? normalizeAccountMode(req.body.mode) : null;
+  if (req.body.mode != null && !mode) {
+    return res.status(400).json({ error: 'Mode must be owner, caregiver, or both' });
+  }
+
+  let userId = req.user.id;
+
+  if (mode) {
+    const existingSitter = await prisma.sitterProfile.findUnique({
+      where: { userId },
+    });
+
+    if (mode === 'owner' && existingSitter) {
+      const bookingCount = await prisma.booking.count({
+        where: { sitterId: existingSitter.id },
+      });
+
+      if (bookingCount > 0) {
+        return res.status(400).json({
+          error: 'Cannot switch to owner-only while you have active bookings as a caregiver.',
+        });
+      }
+
+      await prisma.sitterProfile.delete({ where: { userId } });
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        role: roleForAccountMode(mode),
+        profileMode: mode,
+      },
+    });
+  }
+
+  if (req.body.ownerCare != null) {
+    const ownerPayload = extractOwnerCarePayload({ ownerCare: req.body.ownerCare });
+    const ownerError = validateOwnerCareProfile(ownerPayload);
+    if (ownerError) {
+      return res.status(400).json({ error: ownerError });
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: parseOwnerCareProfile(ownerPayload),
+    });
+  }
+
+  if (req.body.caregiverProfile != null) {
+    const existing = await prisma.sitterProfile.findUnique({ where: { userId } });
+    const profilePayload = extractCaregiverProfilePayload({
+      caregiverProfile: req.body.caregiverProfile,
+    });
+    const profileError = validateCaregiverProfile(profilePayload);
+    if (profileError) {
+      return res.status(400).json({ error: profileError });
+    }
+
+    const currentUser = await prisma.user.findUnique({ where: { id: userId } });
+    const sitterData = parseCaregiverProfile(
+      profilePayload,
+      currentUser.name,
+      existing?.rating ?? 5
+    );
+
+    if (existing) {
+      await prisma.sitterProfile.update({
+        where: { userId },
+        data: sitterData,
+      });
+    } else {
+      await prisma.sitterProfile.create({
+        data: { userId, ...sitterData },
+      });
+    }
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { sitterProfile: true },
+  });
+
+  return res.json({
+    ...buildAuthResponse(user, user.sitterProfile),
+    message: 'Profile saved successfully',
+  });
+});
+
 router.put('/account-mode', requireAuth, async (req, res) => {
   if (req.user.role === UserRole.ADMIN) {
     return res.status(403).json({ error: 'Admins cannot change account mode here' });

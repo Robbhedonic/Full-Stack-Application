@@ -140,18 +140,42 @@ export default function App() {
     if (care.careNotes) setCareNotes(care.careNotes);
   }, [serviceType]);
 
+  const dataLoadKeyRef = useRef('');
+
+  const applySessionData = useCallback(
+    (payload) => {
+      if (!payload?.user) return;
+
+      setAuthUser(payload.user);
+      setMySitterProfile(payload.sitterProfile ?? null);
+      setOwnerCare(payload.ownerCare ?? null);
+      const nextMode = payload.accountMode ?? 'owner';
+      setAccountMode((prev) => {
+        if (prev !== nextMode) {
+          dataLoadKeyRef.current = '';
+        }
+        return nextMode;
+      });
+      if (payload.ownerCare) {
+        applyOwnerCareDefaults(payload.ownerCare);
+      }
+      if (payload.user.name) {
+        setOwnerName((current) => current || payload.user.name);
+      }
+    },
+    [applyOwnerCareDefaults]
+  );
+
   const loadSession = useCallback(async () => {
     try {
       const { response, data } = await apiFetch(API.me);
-      setAuthUser(response.ok ? data.user : null);
-      setMySitterProfile(response.ok ? data.sitterProfile ?? null : null);
-      setOwnerCare(response.ok ? data.ownerCare ?? null : null);
-      setAccountMode(response.ok ? data.accountMode ?? 'owner' : 'owner');
-      if (response.ok && data.ownerCare) {
-        applyOwnerCareDefaults(data.ownerCare);
-      }
-      if (response.ok && data.user?.name) {
-        setOwnerName((current) => current || data.user.name);
+      if (response.ok) {
+        applySessionData(data);
+      } else {
+        setAuthUser(null);
+        setMySitterProfile(null);
+        setOwnerCare(null);
+        setAccountMode('owner');
       }
     } catch {
       setAuthUser(null);
@@ -159,7 +183,7 @@ export default function App() {
       setOwnerCare(null);
       setAccountMode('owner');
     }
-  }, [applyOwnerCareDefaults]);
+  }, [applySessionData]);
 
   function formatSitterPetTypes(petTypes) {
     if (!petTypes?.length) return null;
@@ -272,11 +296,11 @@ export default function App() {
     [sortedSitters]
   );
 
-  const dataLoadKeyRef = useRef('');
-
   useEffect(() => {
-    if (!authUserId) {
-      dataLoadKeyRef.current = '';
+    if (!authUserId || currentPage === 'profile') {
+      if (!authUserId) {
+        dataLoadKeyRef.current = '';
+      }
       return;
     }
 
@@ -286,7 +310,7 @@ export default function App() {
     }
     dataLoadKeyRef.current = loadKey;
 
-    if (authUser.role === 'admin') {
+    if (authUser?.role === 'admin') {
       if (currentPage === 'dashboard') {
         navigate('admin');
       }
@@ -308,7 +332,7 @@ export default function App() {
     }
   }, [
     authUserId,
-    authUser,
+    authUser?.role,
     accountMode,
     currentPage,
     navigate,
@@ -539,9 +563,7 @@ export default function App() {
         return;
       }
 
-      setAuthUser(data.user);
-      setMySitterProfile(data.sitterProfile ?? null);
-      setAccountMode(data.accountMode ?? 'owner');
+      applySessionData(data);
       setAuthPassword('');
       setAuthMessage(`Welcome back, ${data.user.name}!`);
 
@@ -661,7 +683,7 @@ export default function App() {
               accountMode={accountMode}
               sitterProfile={mySitterProfile}
               ownerCare={ownerCare}
-              onProfileChange={loadSession}
+              onProfileChange={applySessionData}
               onNavigate={navigate}
             />
           )}

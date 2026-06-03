@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { API, apiFetch } from '../api.js';
 import { PET_TYPE_OPTIONS, PLANT_TYPE_OPTIONS, petTypeLabel, plantTypeLabel } from '../careOptions.js';
@@ -128,6 +128,7 @@ export default function ProfilePage({
   );
   const [feedback, setFeedback] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
+  const saveInFlightRef = useRef(false);
 
   function showError(text) {
     setFeedback({ type: 'error', text });
@@ -270,70 +271,52 @@ export default function ProfilePage({
 
   async function handleSaveAll(event) {
     event.preventDefault();
-    setFeedback(null);
-    setIsSaving(true);
+    if (saveInFlightRef.current || isSaving) {
+      return;
+    }
 
     const updatingCaregiverListing =
       canEditCaregiver && (editingCaregiver || !hasProfile);
 
+    if (canEditOwner && !validateOwnerForm()) {
+      return;
+    }
+
+    if (updatingCaregiverListing && !validateCaregiverForm()) {
+      return;
+    }
+
+    saveInFlightRef.current = true;
+    setFeedback(null);
+    setIsSaving(true);
+
     try {
-      if (canEditOwner && !validateOwnerForm()) {
-        return;
+      const body = { mode };
+      if (canEditOwner) {
+        body.ownerCare = buildOwnerCarePayload().ownerCare;
+      }
+      if (updatingCaregiverListing) {
+        body.caregiverProfile = buildCaregiverPayload().caregiverProfile;
       }
 
-      if (updatingCaregiverListing && !validateCaregiverForm()) {
-        return;
-      }
-
-      const modeResponse = await apiFetch(API.accountMode, {
+      const { response, data } = await apiFetch(API.profile, {
         method: 'PUT',
-        body: JSON.stringify({ mode }),
+        body: JSON.stringify(body),
       });
 
-      if (!modeResponse.response.ok) {
-        showError(modeResponse.data?.error || 'Could not save account type');
+      if (!response.ok) {
+        showError(data?.error || 'Could not save profile');
         return;
       }
 
-      const savedParts = ['Account type'];
-
-      if (canEditOwner) {
-        const ownerResponse = await apiFetch(API.ownerCare, {
-          method: 'PUT',
-          body: JSON.stringify(buildOwnerCarePayload()),
-        });
-
-        if (!ownerResponse.response.ok) {
-          showError(ownerResponse.data?.error || 'Could not save your pet/plant details');
-          return;
-        }
-        savedParts.push('Pet & plant details');
-      }
-
-      if (updatingCaregiverListing) {
-        const profileResponse = await apiFetch(API.caregiverProfile, {
-          method: hasProfile ? 'PUT' : 'POST',
-          body: JSON.stringify(buildCaregiverPayload()),
-        });
-
-        if (!profileResponse.response.ok) {
-          showError(profileResponse.data?.error || 'Could not save caregiver details');
-          return;
-        }
-        savedParts.push('Caregiver listing');
-      }
-
-      await onProfileChange();
+      onProfileChange(data);
       setEditingCaregiver(false);
-      showSuccess(
-        savedParts.length > 1
-          ? `Profile saved successfully (${savedParts.join(', ')}).`
-          : 'Profile saved successfully.'
-      );
+      showSuccess(data.message || 'Profile saved successfully.');
     } catch {
       showError('Could not connect to the server.');
     } finally {
       setIsSaving(false);
+      saveInFlightRef.current = false;
     }
   }
 
@@ -353,8 +336,7 @@ export default function ProfilePage({
         return;
       }
 
-      setMode('owner');
-      await onProfileChange();
+      onProfileChange(data);
       setEditingCaregiver(false);
       showSuccess(data.message || 'Caregiver listing removed.');
     } catch {

@@ -28,6 +28,7 @@ export const API = {
   me: '/api/auth/me',
   login: '/api/auth/login',
   register: '/api/auth/register',
+  profile: '/api/auth/profile',
   caregiverProfile: '/api/auth/caregiver-profile',
   accountMode: '/api/auth/account-mode',
   ownerCare: '/api/auth/owner-care',
