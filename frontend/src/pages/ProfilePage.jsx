@@ -88,8 +88,14 @@ function needsCaregiverDetails(mode) {
   return mode === 'caregiver' || mode === 'both';
 }
 
-function needsOwnerDetails(mode) {
-  return mode === 'owner' || mode === 'both';
+function hasOwnerCareData(ownerCare) {
+  return Boolean(
+    ownerCare?.petType ||
+    ownerCare?.plantType ||
+    ownerCare?.mealsPerDay != null ||
+    ownerCare?.wateringSchedule ||
+    ownerCare?.wateringAmount
+  );
 }
 
 function ownerCareToFormState(ownerCare) {
@@ -113,6 +119,10 @@ export default function ProfilePage({
 }) {
   const hasProfile = Boolean(sitterProfile);
   const [mode, setMode] = useState(accountMode || 'owner');
+  const showOwnerBlock = mode === 'owner' || mode === 'both' || hasOwnerCareData(ownerCare);
+  const showCaregiverBlock = mode === 'caregiver' || mode === 'both' || hasProfile;
+  const canEditOwner = mode === 'owner' || mode === 'both';
+  const canEditCaregiver = mode === 'caregiver' || mode === 'both';
   const [editingCaregiver, setEditingCaregiver] = useState(
     needsCaregiverDetails(accountMode) && !hasProfile
   );
@@ -264,10 +274,10 @@ export default function ProfilePage({
     setIsSaving(true);
 
     const updatingCaregiverListing =
-      needsCaregiverDetails(mode) && (editingCaregiver || !hasProfile);
+      canEditCaregiver && (editingCaregiver || !hasProfile);
 
     try {
-      if (needsOwnerDetails(mode) && !validateOwnerForm()) {
+      if (canEditOwner && !validateOwnerForm()) {
         return;
       }
 
@@ -287,7 +297,7 @@ export default function ProfilePage({
 
       const savedParts = ['Account type'];
 
-      if (needsOwnerDetails(mode)) {
+      if (canEditOwner) {
         const ownerResponse = await apiFetch(API.ownerCare, {
           method: 'PUT',
           body: JSON.stringify(buildOwnerCarePayload()),
@@ -364,7 +374,8 @@ export default function ProfilePage({
           <p className="kicker">Profile</p>
           <h1>My account</h1>
           <p className="hero-note">
-            Choose if you are looking for care, offering care, or both. Caregivers add availability below.
+            You only see and edit your own details here. Other owners and caregivers cannot view your private
+            information unless you message or book with them.
           </p>
         </div>
       </header>
@@ -398,7 +409,37 @@ export default function ProfilePage({
           </div>
         </fieldset>
 
-        {needsCaregiverDetails(mode) && (
+        {showCaregiverBlock && !canEditCaregiver && hasProfile && (
+          <section className="panel caregiver-profile-panel caregiver-profile-readonly">
+            <h3>Your caregiver listing</h3>
+            <p className="hero-note">
+              This is only visible on your profile. Others see your public card when booking. Select Caregiver or
+              Both above to edit.
+            </p>
+            <ul className="caregiver-profile-details">
+              <li>
+                <strong>Services:</strong> {careTypeLabel(sitterProfile.type)}
+              </li>
+              {sitterProfile.petTypes?.length > 0 && (
+                <li>
+                  <strong>I care for:</strong>{' '}
+                  {sitterProfile.petTypes.map((value) => petTypeLabel(value)).join(', ')}
+                </li>
+              )}
+              <li>
+                <strong>Free time:</strong> {sitterProfile.availability}
+              </li>
+              <li>
+                <strong>Area:</strong> {sitterProfile.location}
+              </li>
+              <li>
+                <strong>Rate:</strong> ${sitterProfile.pricePerHour}/hr
+              </li>
+            </ul>
+          </section>
+        )}
+
+        {showCaregiverBlock && canEditCaregiver && (
           <>
             {hasProfile && !editingCaregiver ? (
               <section className="panel caregiver-profile-panel">
@@ -516,11 +557,40 @@ export default function ProfilePage({
           </>
         )}
 
-        {needsOwnerDetails(mode) && (
+        {showOwnerBlock && !canEditOwner && hasOwnerCareData(ownerCare) && (
+          <section className="panel owner-care-readonly">
+            <h3>Your pets and plants</h3>
+            <p className="hero-note">
+              Private to you. Select Pet &amp; plant owner or Both above to edit.
+            </p>
+            <ul className="caregiver-profile-details">
+              {ownerCare.petType && (
+                <li>
+                  <strong>Pet:</strong> {petTypeLabel(ownerCare.petType)}
+                  {ownerCare.mealsPerDay != null ? ` — ${ownerCare.mealsPerDay} meal(s)/day` : ''}
+                </li>
+              )}
+              {ownerCare.plantType && (
+                <li>
+                  <strong>Plants:</strong> {plantTypeLabel(ownerCare.plantType)}
+                  {ownerCare.wateringSchedule ? ` — ${ownerCare.wateringSchedule}` : ''}
+                  {ownerCare.wateringAmount ? ` (${ownerCare.wateringAmount})` : ''}
+                </li>
+              )}
+              {ownerCare.careNotes && (
+                <li>
+                  <strong>Notes:</strong> {ownerCare.careNotes}
+                </li>
+              )}
+            </ul>
+          </section>
+        )}
+
+        {showOwnerBlock && canEditOwner && (
           <fieldset className="owner-care-fieldset">
             <legend>Your pets and plants</legend>
             <p className="hero-note">
-              These details appear on your care requests so sitters know what you have and how to care for them.
+              Private to you. Shared with sitters only through your bookings and messages.
             </p>
 
             <div className="owner-care-block">

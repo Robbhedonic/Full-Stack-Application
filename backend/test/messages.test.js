@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loginAs, resetTestState, startServer, stopServer } from './helpers.js';
+import { fetchSitters, loginAs, resetTestState, startServer, stopServer } from './helpers.js';
 
 test.beforeEach(async () => {
   await resetTestState();
@@ -11,8 +11,7 @@ test('owner can message a caregiver and read the thread', async () => {
 
   try {
     const { cookie } = await loginAs(baseUrl);
-    const sittersResponse = await fetch(`${baseUrl}/api/sitters`);
-    const sittersData = await sittersResponse.json();
+    const { data: sittersData } = await fetchSitters(baseUrl, cookie);
     const sitterId = sittersData.sitters[0]?.id;
     assert.ok(sitterId);
 

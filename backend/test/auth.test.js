@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loginAs, resetTestState, startServer, stopServer } from './helpers.js';
+import { fetchSitters, loginAs, resetTestState, startServer, stopServer } from './helpers.js';
 
 test.beforeEach(async () => {
   await resetTestState();
@@ -29,8 +29,8 @@ test('POST /api/bookings requires authentication', async () => {
   const { server, baseUrl } = startServer();
 
   try {
-    const sittersRes = await fetch(`${baseUrl}/api/sitters`);
-    const sittersData = await sittersRes.json();
+    const { cookie } = await loginAs(baseUrl);
+    const { data: sittersData } = await fetchSitters(baseUrl, cookie);
 
     const response = await fetch(`${baseUrl}/api/bookings`, {
       method: 'POST',

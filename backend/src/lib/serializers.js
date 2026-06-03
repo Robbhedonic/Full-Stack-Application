@@ -21,6 +21,28 @@ export function serializeSitter(sitter) {
   };
 }
 
+/** Public caregiver card — no private schedule fields; never includes other users' owner data. */
+export function serializePublicSitter(sitter) {
+  const availability = sitter.availability ?? null;
+  return {
+    id: sitter.id,
+    name: sitter.name,
+    type: sitter.type,
+    petTypes: sitter.petTypes
+      ? sitter.petTypes
+          .split(',')
+          .map((value) => value.trim())
+          .filter(Boolean)
+      : [],
+    availability,
+    isAvailable: Boolean(availability?.trim()),
+    rating: sitter.rating,
+    pricePerHour: sitter.pricePerHour,
+    description: sitter.description,
+    location: sitter.location,
+  };
+}
+
 export function serializeMessage(message) {
   return {
     id: message.id,

@@ -1,27 +1,38 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
-import { serializeSitter } from '../lib/serializers.js';
+import { serializePublicSitter } from '../lib/serializers.js';
+import { canBrowseCaregiverListings } from '../lib/userPrivacy.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
-router.get('/', async (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
+  if (!(await canBrowseCaregiverListings(req.user))) {
+    return res.status(403).json({
+      error: 'Only pet and plant owners can browse caregiver listings. Caregivers cannot view other caregivers.',
+    });
+  }
+
   const type = req.query.type?.toString().toLowerCase();
-  let where;
+  let typeFilter;
 
   if (type === 'pet') {
-    where = { type: { in: ['pet', 'both'] } };
+    typeFilter = { type: { in: ['pet', 'both'] } };
   } else if (type === 'plant') {
-    where = { type: { in: ['plant', 'both'] } };
+    typeFilter = { type: { in: ['plant', 'both'] } };
   } else if (type) {
-    where = { type };
+    typeFilter = { type };
   }
 
   const sitters = await prisma.sitterProfile.findMany({
-    where,
+    where: {
+      ...(typeFilter ?? {}),
+      OR: [{ userId: null }, { userId: { not: req.user.id } }],
+    },
     orderBy: { name: 'asc' },
   });
 
-  return res.json({ sitters: sitters.map(serializeSitter) });
+  return res.json({ sitters: sitters.map(serializePublicSitter) });
 });
 
 export default router;

@@ -1,6 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cookieHeaderFromResponse, resetTestState, startServer, stopServer } from './helpers.js';
+import {
+  cookieHeaderFromResponse,
+  fetchSitters,
+  loginAs,
+  resetTestState,
+  startServer,
+  stopServer,
+} from './helpers.js';
 
 test.beforeEach(async () => {
   await resetTestState();
@@ -74,9 +81,10 @@ test('user can register, set both mode, and create caregiver listing', async () 
 
     assert.equal(profileResponse.status, 201);
 
-    const sittersResponse = await fetch(`${baseUrl}/api/sitters?type=pet`);
-    const sitters = (await sittersResponse.json()).sitters;
-    assert.ok(sitters.some((sitter) => sitter.name === 'Both Mode User'));
+    const ownerSession = await loginAs(baseUrl, email);
+    const { data: sittersPayload } = await fetchSitters(baseUrl, ownerSession.cookie, '?type=pet');
+    const sitters = sittersPayload.sitters;
+    assert.ok(sitters.some((sitter) => sitter.name === 'Luna Morales'));
 
     const bookingResponse = await fetch(`${baseUrl}/api/bookings`, {
       method: 'POST',

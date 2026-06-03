@@ -21,6 +21,14 @@ export function cookieHeaderFromResponse(response) {
   return raw ? raw.split(';')[0] : '';
 }
 
+export async function fetchSitters(baseUrl, cookie, query = '') {
+  const response = await fetch(`${baseUrl}/api/sitters${query}`, {
+    headers: { Cookie: cookie, Origin: 'http://localhost:5173' },
+  });
+  const data = await response.json();
+  return { response, data };
+}
+
 export async function loginAs(baseUrl, email = 'jane@petcare.test', password = 'password123') {
   const response = await fetch(`${baseUrl}/api/auth/login`, {
     method: 'POST',
