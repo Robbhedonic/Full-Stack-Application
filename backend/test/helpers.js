@@ -1,4 +1,5 @@
 import { app } from '../src/server.js';
+import { prisma } from '../src/lib/prisma.js';
 import { clearSessionsForTests } from '../src/lib/sessions.js';
 
 export function startServer() {
@@ -35,4 +36,5 @@ export async function loginAs(baseUrl, email = 'jane@petcare.test', password = '
 
 export async function resetTestState() {
   await clearSessionsForTests();
+  await prisma.message.deleteMany();
 }

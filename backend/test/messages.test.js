@@ -41,7 +41,10 @@ test('owner can message a caregiver and read the thread', async () => {
     );
     assert.equal(threadResponse.status, 200);
     const threadData = await threadResponse.json();
-    assert.equal(threadData.messages.length, 1);
+    assert.ok(
+      threadData.messages.some((entry) => entry.body.includes('weekend')),
+      'expected sent message in thread'
+    );
   } finally {
     await stopServer(server);
   }

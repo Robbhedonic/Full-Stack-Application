@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "test": "node --test",
+    "test": "node --test --test-concurrency=1",
     "lint": "eslint . --ext js --max-warnings 0",
     "lint:fix": "eslint . --ext js --fix",
     "format": "prettier . --write",
