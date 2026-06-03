@@ -47,9 +47,10 @@ export function validateOwnerCareProfile(payload, { requirePet, requirePlant } =
   const mealsPerDay = normalizeMealsPerDay(payload.mealsPerDay);
   const wateringSchedule = normalizeText(payload.wateringSchedule, { minLength: 3 });
   const wateringAmount = normalizeText(payload.wateringAmount, { minLength: 2 });
-  const careNotes = payload.careNotes
-    ? normalizeText(payload.careNotes, { minLength: 0, maxLength: 1000 })
-    : null;
+  if (payload.careNotes) {
+    const careNotes = normalizeText(payload.careNotes, { minLength: 0, maxLength: 1000 });
+    if (!careNotes) return 'Care notes must be 1000 characters or fewer';
+  }
 
   if (requirePet) {
     if (!petType) return 'Select what type of pet you have';

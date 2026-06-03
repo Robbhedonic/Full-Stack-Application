@@ -4,7 +4,7 @@ import { getSessionUserId } from '../lib/sessions.js';
 import { SESSION_COOKIE } from './auth.js';
 
 export async function requireAdmin(req, res, next) {
-  const userId = getSessionUserId(req.cookies?.[SESSION_COOKIE]);
+  const userId = await getSessionUserId(req.cookies?.[SESSION_COOKIE]);
 
   if (!userId) {
     return res.status(401).json({ error: 'Authentication required' });

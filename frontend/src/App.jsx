@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { API, apiFetch } from './api.js';
 import { pageToPath, pathToPage } from './routes.js';
 import AboutPage from './pages/AboutPage.jsx';
@@ -14,10 +14,6 @@ import {
   petTypeLabel,
   plantTypeLabel,
 } from './careOptions.js';
-
-function isOwnerRole(role) {
-  return ['owner-pet', 'owner-plant', 'owner-mixed'].includes(role);
-}
 
 function seeksCare(accountMode) {
   return accountMode === 'owner' || accountMode === 'both';
@@ -208,7 +204,8 @@ export default function App() {
   useEffect(() => {
     loadHealth();
     loadSession();
-  }, [loadHealth, loadSession]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
+  }, []);
 
   const loadAdminStats = useCallback(async () => {
     try {
@@ -220,14 +217,28 @@ export default function App() {
     }
   }, []);
 
-  useEffect(() => {
-    if (currentPage === 'profile' && authUser) {
-      loadSession();
-    }
-  }, [currentPage, authUser, loadSession]);
+  const authUserId = authUser?.id ?? null;
+
+  const filteredSitters = useMemo(
+    () => sitters.filter((sitter) => sitter.type === serviceType || sitter.type === 'both'),
+    [sitters, serviceType]
+  );
+
+  const dataLoadKeyRef = useRef('');
 
   useEffect(() => {
-    if (authUser?.role === 'admin') {
+    if (!authUserId) {
+      dataLoadKeyRef.current = '';
+      return;
+    }
+
+    const loadKey = `${authUserId}:${currentPage}:${accountMode}`;
+    if (dataLoadKeyRef.current === loadKey) {
+      return;
+    }
+    dataLoadKeyRef.current = loadKey;
+
+    if (authUser.role === 'admin') {
       if (currentPage === 'dashboard') {
         navigate('admin');
       }
@@ -237,18 +248,14 @@ export default function App() {
       return;
     }
 
-    if (authUser) {
-      loadBookings();
-      if (authUser.name) setOwnerName(authUser.name);
-      if (isOwnerRole(authUser.role)) {
-        loadSitters();
-      }
+    loadBookings();
+    if (authUser.name) {
+      setOwnerName((current) => current || authUser.name);
     }
-  }, [authUser, currentPage, navigate, loadSitters, loadBookings, loadAdminStats]);
-
-  const filteredSitters = sitters.filter(
-    (sitter) => sitter.type === serviceType || sitter.type === 'both'
-  );
+    if (seeksCare(accountMode)) {
+      loadSitters();
+    }
+  }, [authUserId, authUser, accountMode, currentPage, navigate, loadSitters, loadBookings, loadAdminStats]);
 
   useEffect(() => {
     if (filteredSitters.length === 0) {
@@ -259,7 +266,7 @@ export default function App() {
     if (!stillValid) {
       setSelectedSitter(filteredSitters[0].id);
     }
-  }, [filteredSitters, selectedSitter, serviceType]);
+  }, [filteredSitters, selectedSitter]);
 
   function handleServiceTypeChange(nextType) {
     setServiceType(nextType);

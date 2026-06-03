@@ -132,7 +132,6 @@ async function upsertUser(user, passwordHash) {
     where: { email: user.email },
     update: {
       name: user.name,
-      role: user.role,
       passwordHash,
       ...ownerCare,
     },

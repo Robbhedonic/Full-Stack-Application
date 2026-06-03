@@ -5,7 +5,7 @@ import { serializeUser } from '../lib/serializers.js';
 export const SESSION_COOKIE = 'petcare_session';
 
 export async function requireAuth(req, res, next) {
-  const userId = getSessionUserId(req.cookies?.[SESSION_COOKIE]);
+  const userId = await getSessionUserId(req.cookies?.[SESSION_COOKIE]);
 
   if (!userId) {
     return res.status(401).json({ error: 'Authentication required' });
@@ -21,7 +21,7 @@ export async function requireAuth(req, res, next) {
 }
 
 export async function attachUserIfPresent(req, _res, next) {
-  const userId = getSessionUserId(req.cookies?.[SESSION_COOKIE]);
+  const userId = await getSessionUserId(req.cookies?.[SESSION_COOKIE]);
   if (userId) {
     req.user = await prisma.user.findUnique({ where: { id: userId } });
   }

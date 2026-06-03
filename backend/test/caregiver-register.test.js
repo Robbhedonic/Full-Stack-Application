@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cookieHeaderFromResponse, resetTestState, startServer, stopServer } from './helpers.js';
 
-test.beforeEach(() => {
-  resetTestState();
+test.beforeEach(async () => {
+  await resetTestState();
 });
 
 test('user can register, set both mode, and create caregiver listing', async () => {

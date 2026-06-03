@@ -1,21 +1,38 @@
 import { randomBytes } from 'node:crypto';
+import { prisma } from './prisma.js';
 
-const sessions = new Map();
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-export function createSession(userId) {
+export async function createSession(userId) {
   const sessionId = randomBytes(32).toString('hex');
-  sessions.set(sessionId, { userId, createdAt: Date.now() });
+  const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
+
+  await prisma.session.create({
+    data: { id: sessionId, userId, expiresAt },
+  });
+
   return sessionId;
 }
 
-export function getSessionUserId(sessionId) {
-  return sessions.get(sessionId)?.userId ?? null;
+export async function getSessionUserId(sessionId) {
+  if (!sessionId) return null;
+
+  const session = await prisma.session.findUnique({ where: { id: sessionId } });
+  if (!session) return null;
+
+  if (session.expiresAt.getTime() <= Date.now()) {
+    await prisma.session.delete({ where: { id: sessionId } }).catch(() => {});
+    return null;
+  }
+
+  return session.userId;
 }
 
-export function deleteSession(sessionId) {
-  sessions.delete(sessionId);
+export async function deleteSession(sessionId) {
+  if (!sessionId) return;
+  await prisma.session.deleteMany({ where: { id: sessionId } });
 }
 
-export function clearSessionsForTests() {
-  sessions.clear();
+export async function clearSessionsForTests() {
+  await prisma.session.deleteMany();
 }

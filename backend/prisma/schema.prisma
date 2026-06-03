@@ -31,6 +31,17 @@ model User {
   createdAt             DateTime       @default(now())
   sitterProfile         SitterProfile?
   bookings              Booking[]      @relation("OwnerBookings")
+  sessions              Session[]
+}
+
+model Session {
+  id        String   @id
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model SitterProfile {

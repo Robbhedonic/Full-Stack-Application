@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loginAs, resetTestState, startServer, stopServer } from './helpers.js';
 
-test.beforeEach(() => {
-  resetTestState();
+test.beforeEach(async () => {
+  await resetTestState();
 });
 
 test('POST /api/auth/login works with seeded user', async () => {

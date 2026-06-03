@@ -33,6 +33,6 @@ export async function loginAs(baseUrl, email = 'jane@petcare.test', password = '
   return { response, cookie: cookieHeaderFromResponse(response) };
 }
 
-export function resetTestState() {
-  clearSessionsForTests();
+export async function resetTestState() {
+  await clearSessionsForTests();
 }

@@ -205,6 +205,14 @@ export default function ProfilePage({
     setIsSaving(true);
 
     try {
+      if (needsOwnerDetails(mode) && !validateOwnerForm()) {
+        return;
+      }
+
+      if (needsCaregiverDetails(mode) && !validateCaregiverForm()) {
+        return;
+      }
+
       const modeResponse = await apiFetch(API.accountMode, {
         method: 'PUT',
         body: JSON.stringify({ mode }),
@@ -216,10 +224,6 @@ export default function ProfilePage({
       }
 
       if (needsOwnerDetails(mode)) {
-        if (!validateOwnerForm()) {
-          return;
-        }
-
         const ownerResponse = await apiFetch(API.ownerCare, {
           method: 'PUT',
           body: JSON.stringify(buildOwnerCarePayload()),
@@ -232,10 +236,6 @@ export default function ProfilePage({
       }
 
       if (needsCaregiverDetails(mode)) {
-        if (!validateCaregiverForm()) {
-          return;
-        }
-
         const profileResponse = await apiFetch(API.caregiverProfile, {
           method: hasProfile ? 'PUT' : 'POST',
           body: JSON.stringify(buildCaregiverPayload()),

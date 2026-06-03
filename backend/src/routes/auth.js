@@ -36,8 +36,8 @@ function sessionCookieOptions() {
   };
 }
 
-function attachSession(res, userId) {
-  const sessionId = createSession(userId);
+async function attachSession(res, userId) {
+  const sessionId = await createSession(userId);
   res.cookie(SESSION_COOKIE, sessionId, sessionCookieOptions());
 }
 
@@ -106,7 +106,7 @@ router.post('/login', async (req, res) => {
     return res.status(401).json({ error: 'Invalid email or password' });
   }
 
-  attachSession(res, user.id);
+  await attachSession(res, user.id);
 
   return res.json(buildAuthResponse(user, user.sitterProfile));
 });
@@ -273,8 +273,8 @@ router.delete('/caregiver-profile', requireAuth, async (req, res) => {
   });
 });
 
-router.post('/logout', (req, res) => {
-  deleteSession(req.cookies?.[SESSION_COOKIE]);
+router.post('/logout', async (req, res) => {
+  await deleteSession(req.cookies?.[SESSION_COOKIE]);
   const clearOptions = { ...sessionCookieOptions() };
   delete clearOptions.maxAge;
   res.clearCookie(SESSION_COOKIE, clearOptions);
@@ -282,7 +282,7 @@ router.post('/logout', (req, res) => {
 });
 
 router.get('/me', async (req, res) => {
-  const userId = getSessionUserId(req.cookies?.[SESSION_COOKIE]);
+  const userId = await getSessionUserId(req.cookies?.[SESSION_COOKIE]);
   if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
