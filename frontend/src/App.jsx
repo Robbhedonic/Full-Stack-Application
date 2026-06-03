@@ -74,6 +74,12 @@ export default function App() {
   const [mySitterProfile, setMySitterProfile] = useState(null);
   const [accountMode, setAccountMode] = useState('owner');
   const [registerSuccess, setRegisterSuccess] = useState(false);
+  const [messageThreads, setMessageThreads] = useState([]);
+  const [activeChat, setActiveChat] = useState(null);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [messageDraft, setMessageDraft] = useState('');
+  const [messageFeedback, setMessageFeedback] = useState('');
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
 
   function roleLabel(role) {
     const labels = {
@@ -178,6 +184,32 @@ export default function App() {
     }
   }, []);
 
+  const loadMessageThreads = useCallback(async () => {
+    try {
+      const { response, data } = await apiFetch(API.messageThreads);
+      if (response.status === 401) {
+        setMessageThreads([]);
+        return;
+      }
+      if (!response.ok) throw new Error();
+      setMessageThreads(data.threads || []);
+    } catch {
+      setMessage('Unable to load messages.');
+    }
+  }, []);
+
+  const loadChatMessages = useCallback(async (sitterId, ownerId) => {
+    try {
+      const params = new URLSearchParams({ sitterId, ownerId });
+      const { response, data } = await apiFetch(`${API.messages}?${params}`);
+      if (!response.ok) throw new Error();
+      setChatMessages(data.messages || []);
+    } catch {
+      setMessageFeedback('Could not load conversation.');
+      setChatMessages([]);
+    }
+  }, []);
+
   const loadBookings = useCallback(async () => {
     try {
       const { response, data } = await apiFetch(API.bookings);
@@ -224,6 +256,22 @@ export default function App() {
     [sitters, serviceType]
   );
 
+  const sortedSitters = useMemo(
+    () =>
+      [...filteredSitters].sort((a, b) => {
+        if (a.isAvailable === b.isAvailable) {
+          return a.name.localeCompare(b.name);
+        }
+        return a.isAvailable ? -1 : 1;
+      }),
+    [filteredSitters]
+  );
+
+  const availableSittersCount = useMemo(
+    () => sortedSitters.filter((sitter) => sitter.isAvailable).length,
+    [sortedSitters]
+  );
+
   const dataLoadKeyRef = useRef('');
 
   useEffect(() => {
@@ -255,7 +303,20 @@ export default function App() {
     if (seeksCare(accountMode)) {
       loadSitters();
     }
-  }, [authUserId, authUser, accountMode, currentPage, navigate, loadSitters, loadBookings, loadAdminStats]);
+    if (seeksCare(accountMode) || offersCare(accountMode)) {
+      loadMessageThreads();
+    }
+  }, [
+    authUserId,
+    authUser,
+    accountMode,
+    currentPage,
+    navigate,
+    loadSitters,
+    loadBookings,
+    loadAdminStats,
+    loadMessageThreads,
+  ]);
 
   useEffect(() => {
     if (filteredSitters.length === 0) {
@@ -271,6 +332,69 @@ export default function App() {
   function handleServiceTypeChange(nextType) {
     setServiceType(nextType);
     applyOwnerCareDefaults(ownerCare, nextType);
+  }
+
+  function openChatWithSitter(sitter) {
+    if (!authUser) return;
+    const chat = {
+      sitterId: sitter.id,
+      ownerId: authUser.id,
+      sitterName: sitter.name,
+      ownerName: authUser.name,
+    };
+    setActiveChat(chat);
+    setMessageDraft('');
+    setMessageFeedback('');
+    loadChatMessages(chat.sitterId, chat.ownerId);
+  }
+
+  function openMessageThread(thread) {
+    const chat = {
+      sitterId: thread.sitterId,
+      ownerId: thread.ownerId,
+      sitterName: thread.sitterName,
+      ownerName: thread.ownerName,
+    };
+    setActiveChat(chat);
+    setMessageDraft('');
+    setMessageFeedback('');
+    loadChatMessages(chat.sitterId, chat.ownerId);
+  }
+
+  async function handleSendMessage(event) {
+    event.preventDefault();
+    if (!activeChat || !messageDraft.trim()) {
+      setMessageFeedback('Write a message before sending.');
+      return;
+    }
+
+    setIsSendingMessage(true);
+    setMessageFeedback('');
+
+    try {
+      const { response, data } = await apiFetch(API.messages, {
+        method: 'POST',
+        body: JSON.stringify({
+          sitterId: activeChat.sitterId,
+          ownerId: activeChat.ownerId,
+          body: messageDraft.trim(),
+        }),
+      });
+
+      if (!response.ok) {
+        setMessageFeedback(data?.error || 'Could not send message.');
+        return;
+      }
+
+      setChatMessages((current) => [...current, data.message]);
+      setMessageDraft('');
+      setMessageFeedback('Message sent.');
+      loadMessageThreads();
+    } catch {
+      setMessageFeedback('Could not connect to the server.');
+    } finally {
+      setIsSendingMessage(false);
+    }
   }
 
   async function handleSubmit(event) {
@@ -843,17 +967,113 @@ export default function App() {
               )}
             </section>
 
+            {(seeksCare(accountMode) || offersCare(accountMode)) && (
+              <section className="panel messages-panel">
+                <h3>Messages</h3>
+                <p className="hero-note">
+                  {seeksCare(accountMode)
+                    ? 'Contact caregivers to ask about availability before booking.'
+                    : 'Replies from pet and plant owners appear here.'}
+                </p>
+
+                {messageThreads.length > 0 ? (
+                  <ul className="message-thread-list">
+                    {messageThreads.map((thread) => (
+                      <li key={`${thread.sitterId}-${thread.ownerId}`}>
+                        <button
+                          type="button"
+                          className={
+                            activeChat?.sitterId === thread.sitterId &&
+                            activeChat?.ownerId === thread.ownerId
+                              ? 'thread-btn active'
+                              : 'thread-btn'
+                          }
+                          onClick={() => openMessageThread(thread)}
+                        >
+                          <strong>{thread.otherPartyName || 'Conversation'}</strong>
+                          {thread.isAvailable && <span className="availability-badge">Available</span>}
+                          <span className="thread-preview">{thread.lastMessage}</span>
+                          {thread.sitterAvailability && (
+                            <span className="thread-availability">Schedule: {thread.sitterAvailability}</span>
+                          )}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="hero-note">No conversations yet. Message a caregiver below.</p>
+                )}
+
+                {activeChat && (
+                  <div className="message-chat">
+                    <p className="message-chat-title">
+                      Chat with{' '}
+                      <strong>
+                        {activeChat.ownerId === authUser?.id
+                          ? activeChat.sitterName
+                          : activeChat.ownerName}
+                      </strong>
+                    </p>
+                    <ul className="message-list">
+                      {chatMessages.length === 0 ? (
+                        <li className="message-empty">No messages yet. Say hello!</li>
+                      ) : (
+                        chatMessages.map((entry) => (
+                          <li
+                            key={entry.id}
+                            className={entry.isMine ? 'message-bubble message-mine' : 'message-bubble message-theirs'}
+                          >
+                            <span className="message-sender">{entry.senderName}</span>
+                            <p>{entry.body}</p>
+                            <time>{new Date(entry.createdAt).toLocaleString()}</time>
+                          </li>
+                        ))
+                      )}
+                    </ul>
+                    <form onSubmit={handleSendMessage} className="message-compose">
+                      <label>
+                        Your message
+                        <textarea
+                          rows={3}
+                          value={messageDraft}
+                          onChange={(e) => setMessageDraft(e.target.value)}
+                          placeholder="Ask about dates, pets, plants, or special care..."
+                          required
+                        />
+                      </label>
+                      <button type="submit" className="secondary-btn" disabled={isSendingMessage}>
+                        {isSendingMessage ? 'Sending...' : 'Send message'}
+                      </button>
+                      {messageFeedback && <p className="message-feedback">{messageFeedback}</p>}
+                    </form>
+                  </div>
+                )}
+              </section>
+            )}
+
             {seeksCare(accountMode) && (
               <>
                 <section className="panel">
-                  <h3>Available sitters ({serviceType} care)</h3>
-                  {filteredSitters.length === 0 ? (
+                  <h3>Available caregivers ({serviceType} care)</h3>
+                  <p className="hero-note">
+                    {availableSittersCount > 0
+                      ? `${availableSittersCount} caregiver(s) listed their availability.`
+                      : 'No one has posted availability yet — you can still message them.'}
+                  </p>
+                  {sortedSitters.length === 0 ? (
                     <p>No sitters available for {serviceType} care yet.</p>
                   ) : (
                     <ul className="sitter-list">
-                      {filteredSitters.map((sitter) => (
+                      {sortedSitters.map((sitter) => (
                         <li key={sitter.id} className="sitter-card">
-                          <h4>{sitter.name}</h4>
+                          <div className="sitter-card-header">
+                            <h4>{sitter.name}</h4>
+                            {sitter.isAvailable ? (
+                              <span className="availability-badge">Available</span>
+                            ) : (
+                              <span className="availability-badge availability-unknown">Ask for availability</span>
+                            )}
+                          </div>
                           <p>{sitter.description}</p>
                           <div className="sitter-meta">
                             <span>{careTypeLabel(sitter.type)}</span>
@@ -863,6 +1083,22 @@ export default function App() {
                             {sitter.availability && <span>Free time: {sitter.availability}</span>}
                             <span>{sitter.location}</span>
                             <span>${sitter.pricePerHour}/hr</span>
+                          </div>
+                          <div className="sitter-card-actions">
+                            <button
+                              type="button"
+                              className="secondary-btn"
+                              onClick={() => openChatWithSitter(sitter)}
+                            >
+                              Message
+                            </button>
+                            <button
+                              type="button"
+                              className="link-btn"
+                              onClick={() => setSelectedSitter(sitter.id)}
+                            >
+                              Use for booking
+                            </button>
                           </div>
                         </li>
                       ))}

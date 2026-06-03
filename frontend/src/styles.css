@@ -908,6 +908,151 @@ dd {
   color: var(--text-main);
 }
 
+.profile-feedback {
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.profile-feedback-success {
+  background: rgba(45, 90, 61, 0.12);
+  color: #2d5a3d;
+  border: 1px solid rgba(45, 90, 61, 0.28);
+}
+
+.profile-feedback-error {
+  background: rgba(180, 50, 40, 0.1);
+  color: #8b2e24;
+  border: 1px solid rgba(180, 50, 40, 0.22);
+}
+
+.availability-badge {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: rgba(45, 90, 61, 0.15);
+  color: #2d5a3d;
+  border: 1px solid rgba(45, 90, 61, 0.25);
+}
+
+.availability-badge.availability-unknown {
+  background: rgba(15, 45, 58, 0.08);
+  color: var(--text-muted);
+  border-color: rgba(15, 45, 58, 0.15);
+}
+
+.sitter-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.sitter-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+}
+
+.message-thread-list {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.thread-btn {
+  width: 100%;
+  text-align: left;
+  padding: 0.75rem 0.9rem;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 45, 58, 0.12);
+  background: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.thread-btn.active {
+  border-color: rgba(45, 90, 61, 0.45);
+  background: rgba(45, 90, 61, 0.08);
+}
+
+.thread-preview {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.thread-availability {
+  font-size: 0.85rem;
+  color: #2d5a3d;
+}
+
+.message-chat {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px dashed rgba(15, 45, 58, 0.15);
+}
+
+.message-list {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.message-bubble {
+  padding: 0.65rem 0.85rem;
+  border-radius: 10px;
+  max-width: 85%;
+}
+
+.message-mine {
+  margin-left: auto;
+  background: rgba(45, 90, 61, 0.12);
+  border: 1px solid rgba(45, 90, 61, 0.2);
+}
+
+.message-theirs {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(15, 45, 58, 0.12);
+}
+
+.message-sender {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 700;
+  margin-bottom: 0.2rem;
+}
+
+.message-bubble time {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.message-compose textarea {
+  width: 100%;
+  margin-top: 0.35rem;
+}
+
+.message-feedback {
+  margin: 0.5rem 0 0;
+  color: #2d5a3d;
+  font-weight: 600;
+}
+
 .listing-panel {
   display: grid;
   gap: 1.25rem;

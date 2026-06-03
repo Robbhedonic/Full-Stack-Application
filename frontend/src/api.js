@@ -34,5 +34,7 @@ export const API = {
   logout: '/api/auth/logout',
   sitters: '/api/sitters',
   bookings: '/api/bookings',
+  messageThreads: '/api/messages/threads',
+  messages: '/api/messages',
   adminStats: '/api/admin/stats',
 };

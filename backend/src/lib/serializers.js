@@ -1,4 +1,5 @@
 export function serializeSitter(sitter) {
+  const availability = sitter.availability ?? null;
   return {
     id: sitter.id,
     name: sitter.name,
@@ -9,11 +10,44 @@ export function serializeSitter(sitter) {
           .map((value) => value.trim())
           .filter(Boolean)
       : [],
-    availability: sitter.availability ?? null,
+    availability,
+    isAvailable: Boolean(availability?.trim()),
     rating: sitter.rating,
     pricePerHour: sitter.pricePerHour,
     description: sitter.description,
     location: sitter.location,
+  };
+}
+
+export function serializeMessage(message) {
+  return {
+    id: message.id,
+    sitterId: message.sitterId,
+    ownerId: message.ownerId,
+    senderId: message.senderId,
+    senderName: message.sender?.name ?? null,
+    body: message.body,
+    createdAt: message.createdAt.toISOString(),
+    isMine: undefined,
+  };
+}
+
+export function serializeThread(latestMessage, currentUserId) {
+  return {
+    sitterId: latestMessage.sitterId,
+    ownerId: latestMessage.ownerId,
+    sitterName: latestMessage.sitter?.name ?? null,
+    ownerName: latestMessage.owner?.name ?? null,
+    sitterAvailability: latestMessage.sitter?.availability ?? null,
+    sitterLocation: latestMessage.sitter?.location ?? null,
+    lastMessage: latestMessage.body,
+    lastMessageAt: latestMessage.createdAt.toISOString(),
+    lastSenderName: latestMessage.sender?.name ?? null,
+    isAvailable: Boolean(latestMessage.sitter?.availability?.trim()),
+    otherPartyName:
+      latestMessage.ownerId === currentUserId
+        ? latestMessage.sitter?.name
+        : latestMessage.owner?.name,
   };
 }
 

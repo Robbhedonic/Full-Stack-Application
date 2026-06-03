@@ -32,6 +32,8 @@ model User {
   sitterProfile         SitterProfile?
   bookings              Booking[]      @relation("OwnerBookings")
   sessions              Session[]
+  messagesSent          Message[]      @relation("SentMessages")
+  ownerMessageThreads   Message[]      @relation("OwnerMessageThreads")
 }
 
 model Session {
@@ -57,6 +59,22 @@ model SitterProfile {
   description  String
   location     String
   bookings     Booking[]
+  messages     Message[]
+}
+
+model Message {
+  id        String        @id @default(cuid())
+  sitterId  String
+  sitter    SitterProfile @relation(fields: [sitterId], references: [id], onDelete: Cascade)
+  ownerId   String
+  owner     User          @relation("OwnerMessageThreads", fields: [ownerId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User          @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  body      String
+  createdAt DateTime      @default(now())
+
+  @@index([sitterId, ownerId, createdAt])
+  @@index([ownerId])
 }
 
 model Booking {

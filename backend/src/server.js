@@ -10,6 +10,7 @@ import authRouter from './routes/auth.js';
 import sittersRouter from './routes/sitters.js';
 import bookingsRouter from './routes/bookings.js';
 import adminRouter from './routes/admin.js';
+import messagesRouter from './routes/messages.js';
 
 export const app = express();
 const port = Number(process.env.PORT || 8080);
@@ -40,6 +41,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/sitters', sittersRouter);
 app.use('/api/bookings', bookingsRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/messages', messagesRouter);
 
 if (existsSync(publicDir)) {
   app.use(express.static(publicDir));

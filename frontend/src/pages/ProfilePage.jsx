@@ -82,8 +82,16 @@ export default function ProfilePage({
   const [editingCaregiver, setEditingCaregiver] = useState(
     needsCaregiverDetails(accountMode) && !hasProfile
   );
-  const [message, setMessage] = useState('');
+  const [feedback, setFeedback] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  function showError(text) {
+    setFeedback({ type: 'error', text });
+  }
+
+  function showSuccess(text) {
+    setFeedback({ type: 'success', text });
+  }
   const [form, setForm] = useState(() => profileToFormState(sitterProfile));
   const [ownerForm, setOwnerForm] = useState(() => ownerCareToFormState(ownerCare));
 
@@ -132,33 +140,33 @@ export default function ProfilePage({
     );
 
     if (!hasPet && !hasPlant) {
-      setMessage('Tell us about your pet, your plants, or both (type and care instructions).');
+      showError('Tell us about your pet, your plants, or both (type and care instructions).');
       return false;
     }
 
     if (hasPet) {
       if (!ownerForm.petType) {
-        setMessage('Select what type of pet you have.');
+        showError('Select what type of pet you have.');
         return false;
       }
       const meals = Number.parseInt(ownerForm.mealsPerDay, 10);
       if (!Number.isFinite(meals) || meals < 1 || meals > 12) {
-        setMessage('Enter meals per day for your pet (1–12).');
+        showError('Enter meals per day for your pet (1–12).');
         return false;
       }
     }
 
     if (hasPlant) {
       if (!ownerForm.plantType) {
-        setMessage('Select what type of plants you have.');
+        showError('Select what type of plants you have.');
         return false;
       }
       if (!ownerForm.wateringSchedule.trim()) {
-        setMessage('Describe when to water your plants.');
+        showError('Describe when to water your plants.');
         return false;
       }
       if (!ownerForm.wateringAmount.trim()) {
-        setMessage('Describe how much water to use for your plants.');
+        showError('Describe how much water to use for your plants.');
         return false;
       }
     }
@@ -181,19 +189,19 @@ export default function ProfilePage({
 
   function validateCaregiverForm() {
     if (!form.availabilityStart || !form.availabilityEnd) {
-      setMessage('Select both start and end availability dates for caregiver scheduling.');
+      showError('Select both start and end availability dates for caregiver scheduling.');
       return false;
     }
 
     const start = new Date(form.availabilityStart);
     const end = new Date(form.availabilityEnd);
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
-      setMessage('Availability end date must be after the start date.');
+      showError('Availability end date must be after the start date.');
       return false;
     }
 
     if ((form.careType === 'pet' || form.careType === 'both') && form.petTypes.length === 0) {
-      setMessage('Select at least one animal type you can care for.');
+      showError('Select at least one animal type you can care for.');
       return false;
     }
     return true;
@@ -201,15 +209,18 @@ export default function ProfilePage({
 
   async function handleSaveAll(event) {
     event.preventDefault();
-    setMessage('');
+    setFeedback(null);
     setIsSaving(true);
+
+    const updatingCaregiverListing =
+      needsCaregiverDetails(mode) && (editingCaregiver || !hasProfile);
 
     try {
       if (needsOwnerDetails(mode) && !validateOwnerForm()) {
         return;
       }
 
-      if (needsCaregiverDetails(mode) && !validateCaregiverForm()) {
+      if (updatingCaregiverListing && !validateCaregiverForm()) {
         return;
       }
 
@@ -219,9 +230,11 @@ export default function ProfilePage({
       });
 
       if (!modeResponse.response.ok) {
-        setMessage(modeResponse.data?.error || 'Could not save account type');
+        showError(modeResponse.data?.error || 'Could not save account type');
         return;
       }
+
+      const savedParts = ['Account type'];
 
       if (needsOwnerDetails(mode)) {
         const ownerResponse = await apiFetch(API.ownerCare, {
@@ -230,28 +243,34 @@ export default function ProfilePage({
         });
 
         if (!ownerResponse.response.ok) {
-          setMessage(ownerResponse.data?.error || 'Could not save your pet/plant details');
+          showError(ownerResponse.data?.error || 'Could not save your pet/plant details');
           return;
         }
+        savedParts.push('Pet & plant details');
       }
 
-      if (needsCaregiverDetails(mode)) {
+      if (updatingCaregiverListing) {
         const profileResponse = await apiFetch(API.caregiverProfile, {
           method: hasProfile ? 'PUT' : 'POST',
           body: JSON.stringify(buildCaregiverPayload()),
         });
 
         if (!profileResponse.response.ok) {
-          setMessage(profileResponse.data?.error || 'Could not save caregiver details');
+          showError(profileResponse.data?.error || 'Could not save caregiver details');
           return;
         }
+        savedParts.push('Caregiver listing');
       }
 
       await onProfileChange();
       setEditingCaregiver(false);
-      setMessage('Profile saved successfully');
+      showSuccess(
+        savedParts.length > 1
+          ? `Profile saved successfully (${savedParts.join(', ')}).`
+          : 'Profile saved successfully.'
+      );
     } catch {
-      setMessage('Could not connect to the server.');
+      showError('Could not connect to the server.');
     } finally {
       setIsSaving(false);
     }
@@ -263,22 +282,22 @@ export default function ProfilePage({
     }
 
     setIsSaving(true);
-    setMessage('');
+    setFeedback(null);
 
     try {
       const { response, data } = await apiFetch(API.caregiverProfile, { method: 'DELETE' });
 
       if (!response.ok) {
-        setMessage(data?.error || 'Could not delete caregiver profile');
+        showError(data?.error || 'Could not delete caregiver profile');
         return;
       }
 
       setMode('owner');
       await onProfileChange();
       setEditingCaregiver(false);
-      setMessage(data.message || 'Caregiver listing removed');
+      showSuccess(data.message || 'Caregiver listing removed.');
     } catch {
-      setMessage('Could not connect to the server.');
+      showError('Could not connect to the server.');
     } finally {
       setIsSaving(false);
     }
@@ -554,12 +573,23 @@ export default function ProfilePage({
           </fieldset>
         )}
 
+        {feedback && (
+          <p
+            className={
+              feedback.type === 'success'
+                ? 'profile-feedback profile-feedback-success'
+                : 'profile-feedback profile-feedback-error'
+            }
+            role="status"
+          >
+            {feedback.text}
+          </p>
+        )}
+
         <button type="submit" className="action-btn" disabled={isSaving}>
-          Save profile
+          {isSaving ? 'Saving...' : 'Save profile'}
         </button>
       </form>
-
-      {message && <p className="auth-feedback">{message}</p>}
     </article>
   );
 }
