@@ -548,7 +548,7 @@ export default function App() {
       if (data.user.role === 'admin') {
         navigate('admin');
       } else {
-        navigate('profile');
+        navigate('dashboard');
       }
     } catch {
       setAuthMessage('Could not connect to the server.');
@@ -706,8 +706,8 @@ export default function App() {
               <h2>{authMode === 'login' ? 'Login' : 'Register'}</h2>
               <p className="hero-note">
                 {authMode === 'login'
-                  ? 'Sign in to access the platform. Caregivers manage services in Profile.'
-                  : 'Create your account, then sign in. Configure your account type and services from your Profile.'}
+                  ? 'Sign in to open your dashboard. Account details are in Profile when you need them.'
+                  : 'Create your account, then sign in. You will land on the dashboard; configure your account in Profile.'}
               </p>
               {authMode === 'login' && (
                 <p className="hero-note">
