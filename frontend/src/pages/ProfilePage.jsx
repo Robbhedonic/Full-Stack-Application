@@ -6,8 +6,8 @@ import { PET_TYPE_OPTIONS, PLANT_TYPE_OPTIONS, petTypeLabel, plantTypeLabel } fr
 const MODE_OPTIONS = [
   {
     value: 'owner',
-    label: 'Pet owner',
-    hint: 'I need someone to care for my animals',
+    label: 'Pet & plant owner',
+    hint: 'I need someone to care for my animals and plants',
   },
   {
     value: 'caregiver',
@@ -258,7 +258,7 @@ export default function ProfilePage({
   }
 
   async function handleDeleteCaregiverProfile() {
-    if (!window.confirm('Delete your caregiver listing? You will stay a pet owner.')) {
+    if (!window.confirm('Delete your caregiver listing? You will stay a pet & plant owner.')) {
       return;
     }
 
