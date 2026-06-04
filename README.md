@@ -6,214 +6,58 @@ Full-stack booking platform for pet and plant care services.
 - **Backend:** Node.js + Express + Prisma
 - **Database:** PostgreSQL
 
-## Project structure
+## Live demo
 
-### Repository tree
+| | URL |
+|---|-----|
+| **App (try it)** | https://full-stack-application-production-665e.up.railway.app/home |
+| **API health** | https://full-stack-application-production-665e.up.railway.app/api/health |
+| **Admin dashboard** | https://full-stack-application-production-665e.up.railway.app/admin |
+| **Railway project** | https://railway.com/project/44bcd441-924e-4195-835a-b144cba0efc1?environmentId=94cb3579-55fc-456f-9e7b-91a816ec32e1 |
+
+**Demo login** (password for all: `password123`):
+
+| Role | Email |
+|------|-------|
+| Pet owner | `jane@petcare.test` |
+| Caregiver | `luna@petcare.test` |
+| Admin | `admin@petcare.test` |
+
+## Project structure
 
 ```text
 .
-├── frontend/                              # React 18 + Vite 5
+├── frontend/                 # React UI (Vite)
+├── backend/                  # Express API + Prisma (main focus)
 │   ├── src/
-│   │   ├── main.jsx                       # ReactDOM.createRoot → <App />
-│   │   ├── App.jsx                        # SPA shell: pages, auth state, dashboard
-│   │   ├── api.js                         # apiFetch(), API paths, credentials: include
-│   │   ├── routes.js                      # pageToPath() / pathToPage() for browser URLs
-│   │   ├── careOptions.js                 # PET/PLANT options, labels, booking summaries
-│   │   ├── styles.css                     # Global layout, cards, messages, profile UI
-│   │   ├── pages/
-│   │   │   ├── ProfilePage.jsx            # Save profile (PUT /api/auth/profile)
-│   │   │   └── AboutPage.jsx              # Static marketing copy
-│   │   ├── images/                        # Hero / auth / home photos (webp, jpeg)
-│   │   ├── routes.test.js                 # Vitest (2 tests)
-│   │   └── careOptions.test.js            # Vitest (2 tests)
-│   ├── index.html                         # Vite HTML shell
-│   ├── vite.config.js                     # Port 5173, proxy /api → localhost:4000
-│   ├── server.js                          # Docker: static dist + proxy /api → backend
-│   ├── package.json                       # dev, build, test (vitest), lint
-│   ├── package-lock.json
-│   ├── .env.example                       # VITE_API_URL (optional in dev)
-│   ├── .eslintrc.cjs
-│   ├── .dockerignore
-│   └── Dockerfile                         # Node image for frontend-only container
-│
-├── backend/                               # Node.js ESM + Express 4
-│   ├── src/
-│   │   ├── server.js                      # App entry: CORS, cookieParser, json, routers
-│   │   ├── middleware/
-│   │   │   ├── auth.js                    # SESSION_COOKIE, requireAuth → req.user
-│   │   │   └── admin.js                   # requireAdmin (UserRole.ADMIN)
-│   │   ├── routes/
-│   │   │   ├── health.js                  # Public liveness probe
-│   │   │   ├── auth.js                    # Register, login, profile, owner/caregiver CRUD
-│   │   │   ├── sitters.js                 # GET list (owners / both only)
-│   │   │   ├── bookings.js                # GET mine, POST create (owners)
-│   │   │   ├── messages.js                # Threads, conversation, POST message
-│   │   │   └── admin.js                   # GET /stats
-│   │   └── lib/
-│   │       ├── prisma.js                  # Shared PrismaClient
-│   │       ├── sessions.js                # createSession / getSessionUserId / deleteSession
-│   │       ├── serializers.js             # serializeUser, Sitter, Booking, Message, Thread
-│   │       ├── accountMode.js             # owner | caregiver | both → UserRole
-│   │       ├── careDetails.js             # Owner + booking pet/plant validation
-│   │       ├── caregiverProfile.js        # Sitter profile parse + validate
-│   │       ├── bookingAccess.js           # canCreateBookings, role checks
-│   │       ├── bookingQueries.js          # listBookingsForUser (owner vs caregiver view)
-│   │       ├── messageAccess.js           # canAccessThread, canSendMessage
-│   │       └── userPrivacy.js             # serializePublicSitter, owner-only sitter list
-│   ├── test/                              # 14 integration tests (node:test)
-│   │   ├── helpers.js                     # resetTestState, loginAs, fetchSitters
-│   │   ├── auth.test.js                   # Login, 401 without session
-│   │   ├── health.test.js                 # Health + CORS headers
-│   │   ├── petcare.test.js                # Sitters, bookings, isolation
-│   │   ├── messages.test.js               # Owner ↔ caregiver thread
-│   │   └── caregiver-register.test.js     # Register → both → caregiver listing
+│   │   ├── server.js         # Express app, CORS, routes
+│   │   ├── middleware/       # auth.js, admin.js
+│   │   ├── routes/           # health, auth, sitters, bookings, messages, admin
+│   │   └── lib/              # sessions, validation, permissions
 │   ├── prisma/
-│   │   ├── schema.prisma                  # Models + enums (see table below)
-│   │   ├── seed.js                        # 21 users, sitters, bookings, messages
+│   │   ├── schema.prisma
+│   │   ├── seed.js
 │   │   └── migrations/
-│   │       ├── 20260528220000_init/
-│   │       ├── 20260528230000_add_admin_role/
-│   │       ├── 20260529210000_add_pet_type/
-│   │       ├── 20260601180000_sitter_profile_details/
-│   │       ├── 20260602120000_user_profile_mode/
-│   │       ├── 20260603140000_sitter_availability_dates/
-│   │       ├── 20260628120000_owner_and_booking_care_details/
-│   │       ├── 20260629100000_db_sessions/
-│   │       └── 20260630120000_messages/
-│   ├── package.json
-│   ├── package-lock.json
-│   ├── .env.example                       # PORT, DATABASE_URL, FRONTEND_URL
-│   ├── .eslintrc.cjs
-│   ├── .dockerignore
-│   └── Dockerfile                         # API container for docker-compose
-│
-├── .github/workflows/
-│   ├── deploy.yml                         # Full CI on push/PR to main
-│   ├── ci.yml                             # Lint + frontend tests on PRs
-│   └── postdeploy-check.yml               # Manual smoke against live URL
-│
-├── .vscode/                               # launch.json, settings (optional)
-├── scripts/
-│   └── postdeploy-check.mjs               # curl /api/health + login smoke
-├── Dockerfile                             # Production monolith (build frontend + API)
-├── docker-compose.yml                     # db:5432, backend:4000, frontend:8080
-├── railway.toml                           # migrate deploy on start (no repeat seed)
-├── .gitignore                             # .env, node_modules, dist
-├── .dockerignore
-├── .prettierrc / .prettierignore
-├── .eslintignore
+│   └── test/                 # API integration tests (14)
+├── docker-compose.yml
+├── Dockerfile                # Railway deploy
 └── README.md
 ```
 
-### Local ports and services
+### Backend (course essentials)
 
-| Service | Port | URL |
-|---------|------|-----|
-| Vite dev (frontend) | 5173 | http://localhost:5173/home |
-| Express API (backend) | 4000 | http://localhost:4000/api/health |
-| PostgreSQL (Docker) | 5432 | `postgresql://petcare:petcare@localhost:5432/petcare` |
-| docker-compose UI | 8080 | http://localhost:8080 |
-| Railway production | 8080 (in container) | `https://*.up.railway.app` |
+| Folder / file | Role |
+|---------------|------|
+| `server.js` | Entry point: CORS, cookies, JSON, mount `/api/*` routers |
+| `middleware/auth.js` | Session cookie → `req.user` (401 if missing) |
+| `middleware/admin.js` | Admin-only routes |
+| `routes/` | REST handlers (login, bookings, messages, …) |
+| `lib/sessions.js` | Sessions stored in PostgreSQL |
+| `lib/` (other) | Validation, booking/message access, serializers |
+| `prisma/schema.prisma` | Models: User, Session, SitterProfile, Booking, Message |
+| `test/` | Automated API tests (`npm test`) |
 
-### Database models (`backend/prisma/schema.prisma`)
-
-| Model | Purpose |
-|-------|---------|
-| **User** | Account: email, bcrypt `passwordHash`, role, profile mode, owner care fields |
-| **Session** | Server-side session id → `userId`, `expiresAt` (cookie `petcare_session`) |
-| **SitterProfile** | Caregiver listing: type, pet types, availability, price, location |
-| **Booking** | Owner books sitter: pet/plant care details, start time, duration, status |
-| **Message** | Chat between one owner and one sitter (`sitterId` + `ownerId` + `senderId`) |
-
-**Roles (`UserRole`):** `OWNER_PET`, `OWNER_PLANT`, `OWNER_MIXED`, `CAREGIVER`, `ADMIN`  
-**Account modes (UI):** `owner`, `caregiver`, `both` (stored in `User.profileMode`)
-
-### Frontend pages (browser URLs)
-
-| Path | Component | Who uses it |
-|------|-----------|-------------|
-| `/home` | `App.jsx` (home) | Everyone |
-| `/about` | `AboutPage.jsx` | Everyone |
-| `/login`, `/register` | `App.jsx` (auth) | Guests |
-| `/dashboard` | `App.jsx` | Logged-in owners / caregivers |
-| `/profile` | `ProfilePage.jsx` | Logged-in users (edit mode & care details) |
-| `/admin` | `App.jsx` (admin stats) | `admin@petcare.test` only |
-
-### Backend API map (by file)
-
-| File | Endpoints (prefix `/api`) | Auth |
-|------|---------------------------|------|
-| `health.js` | `GET /health` | No |
-| `auth.js` | `POST /auth/register`, `login`, `logout` | No / session |
-| `auth.js` | `GET /auth/me`, `GET /auth/protected` | Session |
-| `auth.js` | `PUT /auth/profile`, `account-mode`, `owner-care` | Session |
-| `auth.js` | `POST|PUT|DELETE /auth/caregiver-profile` | Session |
-| `sitters.js` | `GET /sitters` | Session (owners / both) |
-| `bookings.js` | `GET /bookings`, `POST /bookings` | Session |
-| `messages.js` | `GET /messages/threads`, `GET /messages`, `POST /messages` | Session |
-| `admin.js` | `GET /admin/stats` | Admin session |
-
-### Security-related files
-
-| File | Responsibility |
-|------|----------------|
-| `backend/src/server.js` | CORS whitelist (`FRONTEND_URL`), `credentials: true` |
-| `backend/src/middleware/auth.js` | httpOnly cookie, `requireAuth`, 401 |
-| `backend/src/middleware/admin.js` | Admin-only routes, 403 |
-| `backend/src/lib/sessions.js` | Sessions in PostgreSQL (not in-memory) |
-| `backend/src/routes/auth.js` | bcrypt hash/compare, never store plain passwords |
-| `backend/src/lib/userPrivacy.js` | Owners cannot list other owners’ private data |
-| `frontend/src/api.js` | `credentials: 'include'` on every request |
-| `backend/.env.example` | Template only — real secrets in `.env` / Railway |
-
-### Request flow (example: create booking)
-
-```text
-Browser (React)
-  → api.js: POST /api/bookings + cookie
-  → server.js: cors → cookieParser → json
-  → bookings.js: requireAuth → req.user
-  → bookingAccess.js: canCreateBookings?
-  → careDetails.js: validate pet/plant fields
-  → prisma: Booking.create
-  → JSON { booking }
-```
-
-### npm scripts
-
-**Backend (`cd backend`):**
-
-| Script | Command |
-|--------|---------|
-| `npm run dev` | Nodemon API on port 4000 |
-| `npm test` | 14 integration tests |
-| `npm run lint` | ESLint |
-| `npm run db:migrate` | `prisma migrate dev` |
-| `npm run db:seed` | Demo users + data |
-
-**Frontend (`cd frontend`):**
-
-| Script | Command |
-|--------|---------|
-| `npm run dev` | Vite on port 5173 |
-| `npm test` | 4 Vitest unit tests |
-| `npm run build` | Production bundle → `dist/` |
-| `npm run lint` | ESLint |
-
-### What each layer does
-
-| Layer | Role |
-|-------|------|
-| **frontend/src/App.jsx** | Auth state, dashboard, sitter list, booking form, messaging UI |
-| **frontend/src/pages/ProfilePage.jsx** | Single `PUT /api/auth/profile` save |
-| **frontend/src/api.js** | Central HTTP client for all API calls |
-| **backend/src/server.js** | Wires middleware + routers; serves `public/` on Railway |
-| **backend/src/routes/** | HTTP handlers per feature |
-| **backend/src/lib/** | Validation, permissions, DB helpers (keeps routes thin) |
-| **backend/prisma/** | Schema, migrations, reproducible seed |
-| **backend/test/** | CI guarantees API + CORS + auth rules |
-| **Dockerfile** (root) | One deployable image for Railway monolith |
-| **docker-compose.yml** | Full local stack without Railway |
+**Local API:** http://localhost:4000 · **DB:** PostgreSQL on port 5432
 
 ## Prerequisites
 
@@ -424,10 +268,11 @@ After deploy, run **Actions → Post-Deploy Check → Run workflow** and paste y
 
 ## Deployed URLs
 
-- **App (frontend + API):** https://full-stack-application-production-665e.up.railway.app
-- **Health check:** https://full-stack-application-production-665e.up.railway.app/api/health
-- **Home:** https://full-stack-application-production-665e.up.railway.app/home
-- **Admin:** https://full-stack-application-production-665e.up.railway.app/admin
+See **[Live demo](#live-demo)** above. Quick links:
+
+- **App:** https://full-stack-application-production-665e.up.railway.app/home
+- **Health:** https://full-stack-application-production-665e.up.railway.app/api/health
+- **Railway dashboard:** https://railway.com/project/44bcd441-924e-4195-835a-b144cba0efc1?environmentId=94cb3579-55fc-456f-9e7b-91a816ec32e1
 
 Deployed on **Railway** (monolith: React build served by Express + PostgreSQL plugin).
 
