@@ -10,16 +10,91 @@ Full-stack booking platform for pet and plant care services.
 
 ```text
 .
-├── frontend/
-├── backend/
+├── frontend/                          # React SPA (Vite)
+│   ├── src/
+│   │   ├── main.jsx                   # App entry point
+│   │   ├── App.jsx                    # Routes, dashboard, bookings, messages
+│   │   ├── api.js                     # fetch + credentials (session cookie)
+│   │   ├── routes.js                  # URL paths (/home, /dashboard, …)
+│   │   ├── careOptions.js             # Pet/plant labels and booking summaries
+│   │   ├── styles.css
+│   │   ├── pages/
+│   │   │   ├── ProfilePage.jsx        # Account mode, owner & caregiver profile
+│   │   │   └── AboutPage.jsx
+│   │   ├── images/                    # Static assets for UI
+│   │   ├── routes.test.js             # Vitest: routing helpers
+│   │   └── careOptions.test.js        # Vitest: care labels / summaries
+│   ├── index.html
+│   ├── vite.config.js                 # Dev server + API proxy to :4000
+│   ├── server.js                      # Production static + /api proxy (Docker)
+│   ├── package.json
+│   └── Dockerfile
+│
+├── backend/                           # REST API (Express)
+│   ├── src/
+│   │   ├── server.js                  # CORS, cookies, JSON, mount routers
+│   │   ├── middleware/
+│   │   │   ├── auth.js                # requireAuth (session cookie → req.user)
+│   │   │   └── admin.js               # requireAdmin
+│   │   ├── routes/
+│   │   │   ├── health.js              # GET /api/health
+│   │   │   ├── auth.js                # Login, register, profile, sessions
+│   │   │   ├── sitters.js             # List caregivers (owners only)
+│   │   │   ├── bookings.js            # Create & list bookings
+│   │   │   ├── messages.js            # Threads and chat
+│   │   │   └── admin.js               # Platform stats
+│   │   └── lib/
+│   │       ├── prisma.js              # Prisma client singleton
+│   │       ├── sessions.js            # Session store in PostgreSQL
+│   │       ├── serializers.js         # API JSON shapes (public sitter cards)
+│   │       ├── accountMode.js         # owner / caregiver / both
+│   │       ├── careDetails.js         # Owner pet/plant care fields
+│   │       ├── caregiverProfile.js    # Sitter listing validation
+│   │       ├── bookingAccess.js       # Who can create/view bookings
+│   │       ├── bookingQueries.js      # Booking list queries
+│   │       ├── messageAccess.js       # Thread permissions
+│   │       └── userPrivacy.js         # Role-based data visibility
+│   ├── test/                          # Integration tests (node:test)
+│   │   ├── auth.test.js
+│   │   ├── health.test.js
+│   │   ├── petcare.test.js
+│   │   ├── messages.test.js
+│   │   ├── caregiver-register.test.js
+│   │   └── helpers.js
 │   ├── prisma/
-│   │   ├── schema.prisma
-│   │   ├── seed.js
-│   │   └── migrations/
-│   └── src/
-├── docker-compose.yml
+│   │   ├── schema.prisma              # User, Session, SitterProfile, Booking, Message
+│   │   ├── seed.js                    # 21 demo users + sample data
+│   │   └── migrations/                # Versioned SQL migrations
+│   ├── package.json
+│   ├── .env.example
+│   └── Dockerfile
+│
+├── .github/workflows/
+│   ├── deploy.yml                     # CI: DB, migrate, seed, lint, tests, build
+│   ├── ci.yml                         # PR lint + frontend tests
+│   └── postdeploy-check.yml           # Optional smoke test on live URL
+│
+├── Dockerfile                         # Railway monolith (API + built frontend)
+├── docker-compose.yml                 # Local: db + backend + frontend
+├── railway.toml                       # Deploy start command (migrate, no seed loop)
+├── scripts/postdeploy-check.mjs
 └── README.md
 ```
+
+### What each part does
+
+| Area | Role |
+|------|------|
+| **frontend/src/App.jsx** | Main UI: home, auth, dashboard, bookings, messaging |
+| **frontend/src/api.js** | All HTTP calls to `/api/*` with `credentials: 'include'` |
+| **backend/src/server.js** | Express app, CORS (`FRONTEND_URL`), global middleware |
+| **backend/src/middleware/** | Protect routes (login required, admin only) |
+| **backend/src/routes/** | REST endpoints grouped by feature |
+| **backend/src/lib/** | Business rules shared by routes (privacy, validation) |
+| **backend/prisma/** | Database schema, migrations, demo seed |
+| **backend/test/** | Automated API tests run in GitHub Actions |
+| **docker-compose.yml** | Run PostgreSQL + API + frontend together locally |
+| **Dockerfile** (root) | Single image for production (Railway) |
 
 ## Prerequisites
 
@@ -234,7 +309,7 @@ Deployed on **Railway** (monolith: React build served by Express + PostgreSQL pl
 
 ### 1. Why did you choose this deployment platform? What were the alternatives you considered?
 
-We chose **Railway** because the project already had a root `Dockerfile` and `railway.toml`, and a single public URL simplifies cookies, CORS, and the demo. Alternatives considered were **Render + Vercel** (split frontend/backend), **Azure App Service** (better for enterprise portfolios), and **Fly.io**. Railway was the fastest path to a working production deploy with built-in PostgreSQL.
+I chose **Railway** because the project already had a root `Dockerfile` and `railway.toml`, and a single public URL simplifies cookies, CORS, and the demo. Alternatives considered were **Render + Vercel** (split frontend/backend), **Azure App Service** (better for enterprise portfolios), and **Fly.io**. Railway was the fastest path to a working production deploy with built-in PostgreSQL.
 
 ### 2. What challenges did you face with Docker? How did you solve them?
 
@@ -242,7 +317,7 @@ Main challenges: (1) the app needed PostgreSQL before Prisma migrations could ru
 
 ### 3. How did you handle environment variables and secrets in production vs locally?
 
-Locally, secrets live in `backend/.env` (from `.env.example`) and are gitignored. In production, Railway injects `DATABASE_URL`, `PORT`, and `RAILWAY_PUBLIC_DOMAIN`; we set `NODE_ENV=production` and `FRONTEND_URL=https://${{RAILWAY_PUBLIC_DOMAIN}}`. No secrets are baked into Docker images or committed to GitHub.
+Locally, secrets live in `backend/.env` (from `.env.example`) and are gitignored. In production, Railway injects `DATABASE_URL`, `PORT`, and `RAILWAY_PUBLIC_DOMAIN`; i set `NODE_ENV=production` and `FRONTEND_URL=https://${{RAILWAY_PUBLIC_DOMAIN}}`. No secrets are baked into Docker images or committed to GitHub.
 
 ### 4. What would you do differently if you had one more week?
 
